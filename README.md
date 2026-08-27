@@ -1,199 +1,98 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://neon.com/brand/neon-logo-dark-color.svg?new">
-  <source media="(prefers-color-scheme: light)" srcset="https://neon.com/brand/neon-logo-light-color.svg?new">
-  <img width="250px" alt="Neon Logo" src="https://neon.com/brand/neon-logo-dark-color.svg?new">
-</picture>
+# 潮汐账本（Neon 版本）
 
-# Neon Postgres Vercel Marketplace Template
+基于 Neon 官方 Vercel Marketplace 模板迁移的个人记账 Web 应用。
 
-A minimal template for building full-stack React applications using Next.js, Vercel, and Neon, shipping with Tailwind CSS, Shadcn UI and better-auth.
+技术组合：**Next.js 16 + Vercel + Neon Postgres + Drizzle ORM + Better Auth**。项目保留原有的移动端优先账本界面、可用的金额键盘、账单本地解析和导入预览；认证与数据访问已替换为 Better Auth 会话和服务端 Neon API，不依赖 Supabase。
 
-## Getting Started
+## 当前功能
 
-Click the "Deploy" button to clone this repo, create a new Vercel project, setup the Neon integration, and provision a new Neon database:
+- 响应式首页、账户、计划和报表界面；
+- 支出 / 收入 / 转账记账面板，数字、小数点、退格、清空与保存可用；
+- Better Auth 邮箱 + 密码注册、登录与会话；
+- 首次访问账本 API 时自动建立“日常账本”、微信/支付宝/现金账户和基础分类；
+- 手动记账通过 `POST /api/ledger` 写入 Neon；首页从 `GET /api/ledger` 读取真实流水、收入、支出、结余和最近流水；
+- 微信/支付宝 CSV、XLSX、ZIP 文件在浏览器本地解析并预览，原始文件默认不上传；
+- Drizzle migration 已生成，包含 Better Auth 的用户/会话表和账本领域表。
 
-[![Deploy to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fneondatabase-labs%2Fvercel-marketplace-neon%2Ftree%2Fmain&project-name=my-vercel-neon-app&repository-name=my-vercel-neon-app&products=[{%22type%22:%22integration%22,%22integrationSlug%22:%22neon%22,%22productSlug%22:%22neon%22,%22protocol%22:%22storage%22}])
+## 目录说明
 
-Once the process is complete, you can clone the newly created GitHub repository and start making changes locally.
+```text
+src/lib/auth/                  Better Auth 配置与生成的认证 schema
+src/lib/db/                    Neon + Drizzle 数据库连接
+src/features/ledger/schema.ts  账本、账户、分类、流水、预算、导入批次表
+src/features/ledger/server.ts  默认账本初始化与服务端数据库操作
+src/app/api/ledger/            受 Better Auth 会话保护的账本 API
+src/features/importers/        微信/支付宝/通用账单本地解析
+drizzle/                       由 Drizzle Kit 生成、需要应用到 Neon 的 migration
+```
 
-## Demo
+## Neon 初始化
 
-View live demo: [vercel-marketplace-neon.vercel.app](https://vercel-marketplace-neon.vercel.app/)
+1. 在 Neon 创建一个项目，并创建 `development` 分支；
+2. 从 Neon 的 Connection Details 获取 pooled `DATABASE_URL`；
+3. 复制 `.env.example` 为 `.env.local`，并填写：
 
-![Vercel with Neon](./docs/home.png)
+```env
+DATABASE_URL="postgresql://..."
+BETTER_AUTH_SECRET="至少 32 个随机字符"
+BETTER_AUTH_BASE_URL="http://localhost:5001"
+```
 
-## Local Setup
+PowerShell 生成本地开发密钥：
 
-### Installation
+```powershell
+[Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Maximum 256 }))
+```
 
-Install the dependencies:
+4. 安装依赖并应用 migration：
 
-```bash
+```powershell
 npm install
-```
-
-You can use the package manager of your choice. For example, Vercel also supports `bun install` out of the box.
-
-### Development
-
-#### Create a .env file in the project root
-
-```bash
-cp .env.example .env
-```
-
-#### Get your database URL
-
-Run `vercel env pull` to fetch the environment variables from your Vercel project.
-
-Alternatively, obtain the database connection string from the Connection Details widget on the [Neon Dashboard](https://console.neon.tech/) and add it to the `.env` file:
-
-```txt
-DATABASE_URL=<postgres://user:pass@host/db>
-```
-
-#### Set the Better Auth environment variables
-
-Run `openssl rand -base64 32` to generate a secret and add it to `.env`:
-
-```txt
-BETTER_AUTH_SECRET=<generated-secret>
-```
-
-Set the base URL of your application to your local development URL:
-
-```txt
-BETTER_AUTH_URL=http://localhost:3000
-```
-
-Note: Make sure to set the base URL to your production Vercel URL for your production environment.
-
-#### Start the development server
-
-```bash
+npm run db:migrate
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+5. 打开 `http://localhost:5001`，先创建账号，再登录并记录第一笔账。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Vercel 部署
 
-#### Neon MCP Server & Agent Skill
+在 Vercel 项目中安装 Neon Integration 并连接 Neon 的 **production/main** 分支。然后在 Vercel 的 Production、Preview、Development 环境中配置：
 
-This project includes the [Neon MCP server](https://github.com/neondatabase/mcp-server-neon) and [neon-postgres agent skill](https://github.com/neondatabase/agent-skills) for AI-assisted development with Neon Postgres. Both are configured for Cursor, Claude Code, VS Code, OpenCode, and Codex.
-
-## Shadcn/ui
-
-This project uses [shadcn/ui](https://ui.shadcn.com/) for building accessible and customizable UI components.
-
-### Configuration
-
-Shadcn/ui is configured in `components.json`. The project uses:
-- **Style**: New York
-- **Base Color**: Neutral
-- **Icon Library**: Lucide React
-- **CSS Variables**: Enabled for theming
-
-### Adding Components
-
-To add new shadcn/ui components:
-
-```bash
-npx shadcn@latest add [component-name]
+```env
+DATABASE_URL=
+BETTER_AUTH_SECRET=
+BETTER_AUTH_BASE_URL=
 ```
 
-For example:
-```bash
-npx shadcn@latest add card
-npx shadcn@latest add dialog
+Production 的 `BETTER_AUTH_BASE_URL` 必须是实际线上地址，例如：
+
+```env
+BETTER_AUTH_BASE_URL="https://你的实际域名"
 ```
 
-### Theme Support
+每个 Neon 分支使用独立连接串。推荐：
 
-The project includes a theme provider and selector:
-- **Theme Provider**: `src/components/themes/provider.tsx`
-- **Theme Selector**: `src/components/themes/selector.tsx`
-
-Themes are managed using `next-themes` and support light, dark, and system preferences.
-
-### Existing Components
-
-- `Button` - `src/components/ui/button.tsx`
-- `DropdownMenu` - `src/components/ui/dropdown-menu.tsx`
-
-### Learn More
-
-- [shadcn/ui Documentation](https://ui.shadcn.com/docs)
-- [shadcn/ui Components](https://ui.shadcn.com/docs/components)
-
-## Drizzle ORM
-
-This project uses [Drizzle ORM](https://orm.drizzle.team/) for type-safe database operations with PostgreSQL.
-
-### Configuration
-
-Drizzle is configured in `drizzle.config.ts`. The database client is set up in `src/lib/db/client.ts`.
-
-### Schema
-
-Database schemas are co-located with their features. Auth-related schemas (auto-generated by better-auth) are in `src/lib/auth/schema.ts`. You can add additional schema files for other features and they will be automatically detected by Drizzle Kit.
-
-### Database Scripts
-
-- `npm run db:generate` - Generate migration files from your schema
-- `npm run db:migrate` - Apply migrations to your database
-- `npm run db:studio` - Open Drizzle Studio (visual database browser)
-
-### Usage Example
-
-```typescript
-import { db } from "@/db/client";
-import { user } from "@/auth/schema";
-import { eq } from "drizzle-orm";
-
-// Select all users
-const allUsers = await db.select().from(user);
-
-// Insert a user
-await db.insert(user).values({
-  id: "123",
-  name: "John Doe",
-  email: "john@example.com",
-});
-
-// Update a user
-await db.update(user)
-  .set({ name: "Jane Doe" })
-  .where(eq(user.id, "123"));
+```text
+main          正式数据
+development   本地开发
+preview-*     功能 / Vercel Preview 验证
 ```
 
-### Running Migrations
+## 数据库变更工作流
 
-1. Update your schema files (e.g., `src/lib/auth/schema.ts` or other feature-specific schema files)
-2. Generate migrations: `npm run db:generate`
-3. Review the generated SQL in the `drizzle/` folder
-4. Apply migrations: `npm run db:migrate`
+不要手工修改已经应用到 Neon 的 `drizzle/*.sql` 文件。后续改数据结构时：
 
-### Learn More
+```text
+修改 Drizzle schema
+→ npm run db:generate
+→ 审查 drizzle/ 下新生成的 SQL
+→ 先在 Neon development 分支执行 npm run db:migrate
+→ 验证后再应用到 main
+```
 
-- [Drizzle ORM Documentation](https://orm.drizzle.team/docs/overview)
-- [Drizzle with PostgreSQL](https://orm.drizzle.team/docs/get-started-postgresql)
-- [Drizzle Kit](https://orm.drizzle.team/kit-docs/overview)
+## 下一阶段
 
-## Learn More
-
-To learn more about Neon, check out the Neon documentation:
-
-- [Neon on Vercel Fluid Compute](https://neon.com/docs/guides/vercel-connection-methods) - learn about differnet datatabase connection methods on Fluid.
-- [Neon Documentation](https://neon.tech/docs/introduction) - learn about Neon's features and SDKs.
-- [Neon Discord](https://discord.gg/9kf3G4yUZk) - join the Neon Discord server to ask questions and join the community.
-- [ORM Integrations](https://neon.tech/docs/get-started-with-neon/orms) - find Object-Relational Mappers (ORMs) that work with Neon.
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-## Deploy on Vercel
-
-Commit and push your code changes to your GitHub repository to automatically trigger a new deployment.
+- 让月历和趋势图完全按真实 Neon 流水聚合；
+- 补齐分类管理和预算管理；
+- 将账单导入确认结果批量写入 `transactions`，并实现交易号去重、批次撤销；
+- 为 Preview 部署自动创建/绑定 Neon 分支。
