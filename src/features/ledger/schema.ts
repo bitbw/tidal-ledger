@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { bigint, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, foreignKey, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { user } from "@/lib/auth/schema";
 
 export const books = pgTable("books", {
@@ -31,11 +31,19 @@ export const categories = pgTable("categories", {
   bookId: uuid("book_id").notNull().references(() => books.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   kind: text("kind").notNull(),
+  parentId: uuid("parent_id"),
   icon: text("icon"),
   color: text("color").notNull().default("#28c5b4"),
   sortOrder: integer("sort_order").notNull().default(0),
+  isSystem: boolean("is_system").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+}, (table) => [
+  foreignKey({ columns: [table.parentId], foreignColumns: [table.id], name: "categories_parent_id_categories_id_fk" }).onDelete("restrict"),
+  index("categories_book_kind_parent_sort_idx").on(table.bookId, table.kind, table.parentId, table.sortOrder),
+  index("categories_book_archived_idx").on(table.bookId, table.archivedAt),
+]);
 
 export const importBatches = pgTable("import_batches", {
   id: uuid("id").defaultRandom().primaryKey(),
