@@ -59,6 +59,31 @@ export const importBatches = pgTable("import_batches", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const recurringEntries = pgTable("recurring_entries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  bookId: uuid("book_id").notNull().references(() => books.id, { onDelete: "cascade" }),
+  accountId: uuid("account_id").references(() => accounts.id, { onDelete: "set null" }),
+  categoryId: uuid("category_id").notNull().references(() => categories.id, { onDelete: "restrict" }),
+  transactionType: text("transaction_type").notNull(),
+  amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+  currency: text("currency").notNull().default("CNY"),
+  note: text("note"),
+  intervalCount: integer("interval_count").notNull().default(1),
+  intervalUnit: text("interval_unit").notNull(),
+  startAt: timestamp("start_at", { withTimezone: true }).notNull(),
+  nextRunAt: timestamp("next_run_at", { withTimezone: true }).notNull(),
+  endAt: timestamp("end_at", { withTimezone: true }),
+  status: text("status").notNull().default("active"),
+  endedAt: timestamp("ended_at", { withTimezone: true }),
+  createdBy: text("created_by").notNull().references(() => user.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+}, (table) => [
+  index("recurring_entries_book_status_next_run_idx").on(table.bookId, table.status, table.nextRunAt),
+  index("recurring_entries_book_archived_idx").on(table.bookId, table.archivedAt),
+]);
+
 export const transactions = pgTable("transactions", {
   id: uuid("id").defaultRandom().primaryKey(),
   bookId: uuid("book_id").notNull().references(() => books.id, { onDelete: "cascade" }),
@@ -74,6 +99,8 @@ export const transactions = pgTable("transactions", {
   externalTransactionId: text("external_transaction_id"),
   sourceRowHash: text("source_row_hash"),
   importBatchId: uuid("import_batch_id").references(() => importBatches.id, { onDelete: "set null" }),
+  recurringEntryId: uuid("recurring_entry_id").references(() => recurringEntries.id, { onDelete: "set null" }),
+  recurrenceScheduledFor: timestamp("recurrence_scheduled_for", { withTimezone: true }),
   transferPairId: uuid("transfer_pair_id"),
   createdBy: text("created_by").notNull().references(() => user.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -82,6 +109,7 @@ export const transactions = pgTable("transactions", {
 }, (table) => [
   index("transactions_book_occurred_idx").on(table.bookId, table.occurredAt),
   uniqueIndex("transactions_external_id_idx").on(table.bookId, table.source, table.externalTransactionId),
+  uniqueIndex("transactions_recurring_scheduled_idx").on(table.recurringEntryId, table.recurrenceScheduledFor),
 ]);
 
 export const importRows = pgTable("import_rows", {

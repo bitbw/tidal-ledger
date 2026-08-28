@@ -3,9 +3,11 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 import {
   createLedgerTransaction,
+  ensureDefaultLedger,
   getLedger,
   updateLedgerTransaction,
 } from "@/features/ledger/server";
+import { runDueRecurringEntriesForBook } from "@/features/ledger/recurring";
 
 async function sessionUser() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -16,6 +18,8 @@ export async function GET() {
   const user = await sessionUser();
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const bookId = await ensureDefaultLedger(user.id);
+  await runDueRecurringEntriesForBook(bookId);
   return NextResponse.json(await getLedger(user.id));
 }
 

@@ -48,16 +48,17 @@ import {
   type LedgerCategory,
   type LedgerTransaction,
 } from "@/features/ledger/use-ledger";
+import { useRecurringEntries, type RecurringEntry, type RecurringInput } from "@/features/ledger/use-recurring-entries";
 import { useSession } from "@/lib/auth/client";
 
 type View = "home" | "reports" | "accounts" | "plans" | "transactions";
 type TransactionKind = "expense" | "income";
 
 const navItems: { id: View; label: string; icon: typeof Home }[] = [
-  { id: "accounts", label: "è´¦æˆ·", icon: WalletCards },
-  { id: "plans", label: "è®¡åˆ’", icon: Target },
-  { id: "home", label: "é¦–é¡µ", icon: Home },
-  { id: "reports", label: "æŠ¥è¡¨", icon: BarChart3 },
+  { id: "accounts", label: "ÕË»§", icon: WalletCards },
+  { id: "plans", label: "¼Æ»®", icon: Target },
+  { id: "home", label: "Ê×Ò³", icon: Home },
+  { id: "reports", label: "±¨±í", icon: BarChart3 },
 ];
 
 function categoryIcon(icon?: string | null) {
@@ -101,7 +102,7 @@ function MiniTrend({
       viewBox="0 0 294 170"
       className="h-44 w-full overflow-visible"
       preserveAspectRatio="none"
-      aria-label="æœˆåº¦è¶‹åŠ¿å›¾"
+      aria-label="ÔÂ¶ÈÇ÷ÊÆÍ¼"
     >
       {[28, 70, 112, 154].map((y) => (
         <line
@@ -140,19 +141,19 @@ function MiniTrend({
         vectorEffect="non-scaling-stroke"
       />
       <text x="0" y="168" fill="#a4adb7" fontSize="10">
-        1æ—¥
+        1ÈÕ
       </text>
       <text x="62" y="168" fill="#a4adb7" fontSize="10">
-        6æ—¥
+        6ÈÕ
       </text>
       <text x="118" y="168" fill="#a4adb7" fontSize="10">
-        11æ—¥
+        11ÈÕ
       </text>
       <text x="174" y="168" fill="#a4adb7" fontSize="10">
-        16æ—¥
+        16ÈÕ
       </text>
       <text x="272" y="168" fill="#a4adb7" fontSize="10">
-        31æ—¥
+        31ÈÕ
       </text>
     </svg>
   );
@@ -161,7 +162,7 @@ function MiniTrend({
 function Logo() {
   return (
     <div className="grid size-9 place-items-center rounded-2xl bg-[#e1f7f4] text-[#0c6f78]">
-      <span className="text-lg font-black">æ½®</span>
+      <span className="text-lg font-black">³±</span>
     </div>
   );
 }
@@ -171,10 +172,10 @@ function LoadingScreen() {
     <main className="grid min-h-screen place-items-center bg-[#f3f6f6]">
       <div className="text-center">
         <div className="mx-auto grid size-14 place-items-center rounded-[22px] bg-[#0c6f78] text-2xl font-black text-white shadow-lg">
-          æ½®
+          ³±
         </div>
         <p className="mt-4 text-sm font-medium text-[#65717d]">
-          æ­£åœ¨è¿æ¥ä½ çš„è´¦æœ¬â€¦
+          ÕıÔÚÁ¬½ÓÄãµÄÕË±¾¡­
         </p>
       </div>
     </main>
@@ -189,28 +190,28 @@ function LoginScreen() {
         <div className="flex items-center gap-3">
           <Logo />
           <div>
-            <p className="text-lg font-bold">æ½®æ±è´¦æœ¬</p>
-            <p className="text-xs text-[#8b94a3]">ä»æ¯ä¸€ç¬”ï¼Œçœ‹è§ä½ çš„ç”Ÿæ´»</p>
+            <p className="text-lg font-bold">³±Ï«ÕË±¾</p>
+            <p className="text-xs text-[#8b94a3]">´ÓÃ¿Ò»±Ê£¬¿´¼ûÄãµÄÉú»î</p>
           </div>
         </div>
         <div className="mt-10">
-          <p className="text-2xl font-bold tracking-tight">ç™»å½•ä½ çš„äº‘ç«¯è´¦æœ¬</p>
+          <p className="text-2xl font-bold tracking-tight">µÇÂ¼ÄãµÄÔÆ¶ËÕË±¾</p>
           <p className="mt-2 text-sm leading-6 text-[#78848d]">
-            Neon æ•°æ®åº“ä¸ Better Auth
-            è´¦å·ç³»ç»Ÿå·²å°±ç»ªã€‚é¦–æ¬¡æ³¨å†Œåä¼šè‡ªåŠ¨å»ºç«‹ä½ çš„æ—¥å¸¸è´¦æœ¬ã€‚
+            Neon Êı¾İ¿âÓë Better Auth
+            ÕËºÅÏµÍ³ÒÑ¾ÍĞ÷¡£Ê×´Î×¢²áºó»á×Ô¶¯½¨Á¢ÄãµÄÈÕ³£ÕË±¾¡£
           </p>
         </div>
         <button
           onClick={() => window.location.assign("/sign-in")}
           className="mt-7 w-full rounded-xl bg-[#0c6f78] py-3.5 text-sm font-bold text-white transition hover:bg-[#085d65]"
         >
-          ç™»å½•
+          µÇÂ¼
         </button>
         <button
           onClick={() => window.location.assign("/sign-up")}
           className="mt-3 w-full rounded-xl border border-[#cfe2e1] bg-white py-3.5 text-sm font-bold text-[#0c6f78]"
         >
-          åˆ›å»ºè´¦å·
+          ´´½¨ÕËºÅ
         </button>
       </section>
     </main>
@@ -239,6 +240,7 @@ export default function HomePage() {
   const [toast, setToast] = useState("");
   const [mobileMenu, setMobileMenu] = useState(false);
   const ledger = useLedger(Boolean(session?.user));
+  const recurring = useRecurringEntries(Boolean(session?.user));
 
   const selectableCategories = useMemo(
     () =>
@@ -268,7 +270,7 @@ export default function HomePage() {
       .slice(0, 7);
   }, [ledger.transactions, selectableCategories]);
   const selectedCategory = ledger.categories.find((category) => category.id === selectedCategoryId);
-  const kindLabel = kind === "expense" ? "æ”¯å‡º" : "æ”¶å…¥";
+  const kindLabel = kind === "expense" ? "Ö§³ö" : "ÊÕÈë";
   const SelectedIcon = categoryIcon(selectedCategory?.icon);
   const defaultCategoryId = (targetKind: TransactionKind) =>
     ledger.categories.find(
@@ -283,17 +285,17 @@ export default function HomePage() {
   }
 
   const headline = useMemo(() => {
-    if (view === "transactions") return "å…¨éƒ¨æµæ°´";
-    if (view === "reports") return "æŠ¥è¡¨";
-    if (view === "accounts") return "è´¦æˆ·";
-    if (view === "plans") return "è®¡åˆ’";
-    return "é¦–é¡µ";
+    if (view === "transactions") return "È«²¿Á÷Ë®";
+    if (view === "reports") return "±¨±í";
+    if (view === "accounts") return "ÕË»§";
+    if (view === "plans") return "¼Æ»®";
+    return "Ê×Ò³";
   }, [view]);
 
   function inputNumber(value: string) {
     setAmount((current) => {
       if (value === "clear") return "0";
-      if (value === "âŒ«") {
+      if (value === "?") {
         const next = current.length <= 1 ? "0" : current.slice(0, -1);
         return next === "" || next === "-" ? "0" : next;
       }
@@ -326,7 +328,7 @@ export default function HomePage() {
 
   function openTransactionEditor(transaction: LedgerTransaction) {
     if (transaction.transactionType === "transfer") {
-      setToast("è½¬è´¦ç¼–è¾‘å°†åœ¨è´¦æˆ·æ¨¡å—ä¸Šçº¿åæ”¯æŒã€‚");
+      setToast("×ªÕË±à¼­½«ÔÚÕË»§Ä£¿éÉÏÏßºóÖ§³Ö¡£");
       window.setTimeout(() => setToast(""), 3200);
       return;
     }
@@ -343,11 +345,11 @@ export default function HomePage() {
     if (saving) return;
     const amountCents = Math.round(Number.parseFloat(amount || "0") * 100);
     if (!Number.isFinite(amountCents) || amountCents <= 0) {
-      setToast("è¯·è¾“å…¥å¤§äº 0 çš„é‡‘é¢");
+      setToast("ÇëÊäÈë´óÓÚ 0 µÄ½ğ¶î");
       return;
     }
     if (!selectedCategoryId) {
-      setToast("è¯·é€‰æ‹©åˆ†ç±»");
+      setToast("ÇëÑ¡Ôñ·ÖÀà");
       return;
     }
     try {
@@ -373,10 +375,10 @@ export default function HomePage() {
       setNote("");
       setEditingTransaction(null);
       setToast(
-        editingTransaction ? "æµæ°´å·²æ›´æ–°" : `${kindLabel}å·²ä¿å­˜åˆ°äº‘ç«¯è´¦æœ¬`,
+        editingTransaction ? "Á÷Ë®ÒÑ¸üĞÂ" : `${kindLabel}ÒÑ±£´æµ½ÔÆ¶ËÕË±¾`,
       );
     } catch (cause) {
-      setToast(cause instanceof Error ? cause.message : "ä¿å­˜å¤±è´¥ï¼Œè¯·ç¨åé‡è¯•");
+      setToast(cause instanceof Error ? cause.message : "±£´æÊ§°Ü£¬ÇëÉÔºóÖØÊÔ");
     } finally {
       setSaving(false);
     }
@@ -392,16 +394,16 @@ export default function HomePage() {
         <div className="mb-10 flex items-center gap-3 px-2">
           <Logo />
           <div>
-            <p className="font-semibold tracking-tight">æ½®æ±è´¦æœ¬</p>
-            <p className="text-xs text-[#8b94a3]">ä½ çš„èµ„é‡‘æµå‘</p>
+            <p className="font-semibold tracking-tight">³±Ï«ÕË±¾</p>
+            <p className="text-xs text-[#8b94a3]">ÄãµÄ×Ê½ğÁ÷Ïò</p>
           </div>
         </div>
         <button className="mb-6 flex items-center justify-between rounded-2xl bg-[#f2f7f7] px-3 py-3 text-sm font-medium">
           <span className="flex items-center gap-2">
             <span className="grid size-7 place-items-center rounded-xl bg-[#0c6f78] text-white">
-              æ—¥
+              ÈÕ
             </span>
-            æ—¥å¸¸è´¦æœ¬
+            ÈÕ³£ÕË±¾
           </span>
           <ChevronDown size={15} />
         </button>
@@ -419,9 +421,9 @@ export default function HomePage() {
         </nav>
         <div className="mt-auto rounded-2xl bg-[#0c6f78] p-4 text-white">
           <Sparkles size={18} className="mb-4 text-[#83eee0]" />
-          <p className="text-sm font-semibold">è´¦å•å¯¼å…¥</p>
+          <p className="text-sm font-semibold">ÕËµ¥µ¼Èë</p>
           <p className="mt-1 text-xs leading-5 text-[#c4efea]">
-            å¾®ä¿¡ã€æ”¯ä»˜å®è´¦å•ä¸€é”®æ•´ç†ï¼Œé‡å¤è´¦ç›®è‡ªåŠ¨è·³è¿‡ã€‚
+            Î¢ĞÅ¡¢Ö§¸¶±¦ÕËµ¥Ò»¼üÕûÀí£¬ÖØ¸´ÕËÄ¿×Ô¶¯Ìø¹ı¡£
           </p>
           <button
             onClick={() => {
@@ -430,7 +432,7 @@ export default function HomePage() {
             }}
             className="mt-4 rounded-lg bg-white px-3 py-2 text-xs font-bold text-[#0c6f78]"
           >
-            å¯¼å…¥è´¦å•
+            µ¼ÈëÕËµ¥
           </button>
         </div>
       </aside>
@@ -443,7 +445,7 @@ export default function HomePage() {
               onClick={() => setMobileMenu(!mobileMenu)}
               className="font-semibold"
             >
-              æ—¥å¸¸è´¦æœ¬ <ChevronDown className="inline" size={15} />
+              ÈÕ³£ÕË±¾ <ChevronDown className="inline" size={15} />
             </button>
           </div>
           <h1 className="hidden text-xl font-semibold md:block">{headline}</h1>
@@ -456,7 +458,7 @@ export default function HomePage() {
               className="hidden items-center gap-2 rounded-xl border border-[#dce7e6] bg-white px-3 py-2 text-sm font-medium text-[#365158] hover:bg-[#f6fbfa] sm:flex"
             >
               <FileUp size={16} />
-              å¯¼å…¥è´¦å•
+              µ¼ÈëÕËµ¥
             </button>
             <button className="grid size-10 place-items-center rounded-xl bg-white text-[#50616a] shadow-sm">
               <BellRing size={18} />
@@ -486,9 +488,9 @@ export default function HomePage() {
 
         {ledger.error && (
           <div className="mb-4 flex items-center justify-between rounded-2xl bg-[#fff0ed] px-4 py-3 text-sm text-[#a94a2e]">
-            <span>äº‘ç«¯è´¦æœ¬å°šæœªå°±ç»ªï¼š{ledger.error}</span>
+            <span>ÔÆ¶ËÕË±¾ÉĞÎ´¾ÍĞ÷£º{ledger.error}</span>
             <button onClick={() => void ledger.refresh()} className="font-bold">
-              é‡è¯•
+              ÖØÊÔ
             </button>
           </div>
         )}
@@ -508,14 +510,13 @@ export default function HomePage() {
               setImportOpen(true);
               setImportStep("choose");
             }}
+            onOpenRecurring={() => setView("plans")}
             totals={ledger.totals}
             transactionCount={ledger.transactions.length}
             transactions={ledger.transactions}
           />
         )}
-        {view === "reports" && (
-          <ReportsView transactions={ledger.transactions} />
-        )}
+        {view === "reports" && (\r\n          <ReportsView transactions={ledger.transactions} />\r\n        )}
         {view === "transactions" && (
           <TransactionsView
             transactions={ledger.transactions}
@@ -529,7 +530,7 @@ export default function HomePage() {
           />
         )}
         {view === "accounts" && <AccountsView />}
-        {view === "plans" && <PlansView />}
+        {view === "plans" && <PlansView recurring={recurring} categories={ledger.categories} accounts={ledger.accounts} />}
       </section>
 
       <button
@@ -602,6 +603,7 @@ function HomeView({
   totals,
   transactionCount,
   transactions,
+  onOpenRecurring,
 }: {
   onCompose: () => void;
   onEdit: (transaction: LedgerTransaction) => void;
@@ -611,12 +613,13 @@ function HomeView({
   totals: { income: number; expense: number; balance: number };
   transactionCount: number;
   transactions: LedgerTransaction[];
+  onOpenRecurring: () => void;
 }) {
   const displayRecent = transactions.slice(0, 3).map((item) => ({
     transaction: item,
     icon: item.transactionType === "income" ? WalletCards : Utensils,
     color: item.transactionType === "income" ? "#ff714b" : "#28c5b4",
-    title: item.merchantName || item.note || "æœªå‘½åæµæ°´",
+    title: item.merchantName || item.note || "Î´ÃüÃûÁ÷Ë®",
     meta: new Intl.DateTimeFormat("zh-CN", {
       month: "numeric",
       day: "numeric",
@@ -635,18 +638,18 @@ function HomeView({
         <div className="absolute right-36 top-7 size-24 rounded-full border border-white/[.13]" />
         <div className="relative flex flex-col justify-between gap-8 sm:flex-row">
           <div>
-            <p className="mb-3 text-sm text-[#c6eeea]">æœ¬æœˆæ”¯å‡º Â· äº‘ç«¯è´¦æœ¬</p>
+            <p className="mb-3 text-sm text-[#c6eeea]">±¾ÔÂÖ§³ö ¡¤ ÔÆ¶ËÕË±¾</p>
             <p className="money text-[42px] font-bold leading-none md:text-[54px]">
               {yuan(totals.expense)}
             </p>
             <div className="mt-5 flex flex-wrap gap-x-6 gap-y-1 text-sm">
               <span>
-                æœ¬æœˆæ”¶å…¥{" "}
+                ±¾ÔÂÊÕÈë{" "}
                 <b className="money ml-1 text-white">{yuan(totals.income)}</b>
               </span>
               <span className="hidden text-white/35 sm:inline">|</span>
               <span>
-                æœ¬æœˆç»“ä½™{" "}
+                ±¾ÔÂ½áÓà{" "}
                 <b className="money ml-1 text-white">{yuan(totals.balance)}</b>
               </span>
             </div>
@@ -657,7 +660,7 @@ function HomeView({
               className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-[#0c6f78] shadow-lg transition hover:-translate-y-0.5"
             >
               <Plus size={18} />
-              è®°ä¸€ç¬”
+              ¼ÇÒ»±Ê
             </button>
           </div>
         </div>
@@ -666,41 +669,41 @@ function HomeView({
         <div className="card soft-shadow p-5 md:p-6">
           <div className="mb-4 flex items-start justify-between">
             <div>
-              <p className="text-base font-bold">å…«æœˆé¢„ç®—</p>
+              <p className="text-base font-bold">°ËÔÂÔ¤Ëã</p>
               <p className="mt-1 text-sm text-[#8b94a3]">
-                é¢„ç®—æ¨¡å—å°†åœ¨ä¸‹ä¸€æ­¥æ¥å…¥çœŸå®äº‘ç«¯é…ç½®
+                Ô¤ËãÄ£¿é½«ÔÚÏÂÒ»²½½ÓÈëÕæÊµÔÆ¶ËÅäÖÃ
               </p>
             </div>
             <p className="text-right text-sm text-[#66717d]">
-              å·²è®°å½•
+              ÒÑ¼ÇÂ¼
               <br />
               <b className="money text-2xl text-[#20252b]">
                 {transactionCount}
               </b>{" "}
-              ç¬”
+              ±Ê
             </p>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-[#edf2f2]">
             <div className="h-full w-[35%] rounded-full bg-[#28c5b4]" />
           </div>
           <div className="mt-3 flex justify-between text-xs text-[#8b94a3]">
-            <span>çœŸå®æµæ°´å·²è¿æ¥</span>
-            <span>ä¸‹ä¸€æ­¥ï¼šé¢„ç®—</span>
+            <span>ÕæÊµÁ÷Ë®ÒÑÁ¬½Ó</span>
+            <span>ÏÂÒ»²½£ºÔ¤Ëã</span>
           </div>
         </div>
         <div className="card p-5">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <p className="font-bold">æœ€è¿‘æµæ°´</p>
+              <p className="font-bold">×î½üÁ÷Ë®</p>
               <p className="mt-1 text-sm text-[#8b94a3]">
-                æ¯ä¸€ç¬”éƒ½åœ¨å½¢æˆä½ çš„æ¶ˆè´¹åœ°å›¾
+                Ã¿Ò»±Ê¶¼ÔÚĞÎ³ÉÄãµÄÏû·ÑµØÍ¼
               </p>
             </div>
             <button
               onClick={onViewAll}
               className="text-sm font-medium text-[#0c6f78]"
             >
-              æŸ¥çœ‹å…¨éƒ¨
+              ²é¿´È«²¿
             </button>
           </div>
           <div className="space-y-4">
@@ -725,14 +728,14 @@ function HomeView({
                     <b
                       className={`money ${amount > 0 ? "text-[#ff714b]" : "text-[#20252b]"}`}
                     >
-                      {amount > 0 ? "+" : "-"}Â¥{yuan(Math.abs(amount))}
+                      {amount > 0 ? "+" : "-"}£¤{yuan(Math.abs(amount))}
                     </b>
                   </button>
                 ),
               )
             ) : (
               <p className="rounded-xl bg-[#f5f7f7] px-4 py-6 text-center text-sm text-[#8b94a3]">
-                è¿˜æ²¡æœ‰æµæ°´ï¼Œå…ˆè®°ä¸€ç¬”å§ã€‚
+                »¹Ã»ÓĞÁ÷Ë®£¬ÏÈ¼ÇÒ»±Ê°É¡£
               </p>
             )}
           </div>
@@ -740,15 +743,15 @@ function HomeView({
       </section>
       <CalendarCard transactions={transactions} onSelectDay={onSelectDay} />
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <QuickAction icon={CalendarDays} label="è´¦å•æ—¥å†" color="#f49a5d" />
-        <QuickAction icon={Clock3} label="å‘¨æœŸè´¦" color="#8366e8" />
+        <QuickAction icon={CalendarDays} label="ÕËµ¥ÈÕÀú" color="#f49a5d" />
+        <QuickAction icon={Clock3} label="ÖÜÆÚÕË" color="#8366e8" onClick={onOpenRecurring} />
         <QuickAction
           icon={FileUp}
-          label="å¯¼å…¥è´¦å•"
+          label="µ¼ÈëÕËµ¥"
           color="#0c6f78"
           onClick={onImport}
         />
-        <QuickAction icon={LayoutGrid} label="æ›´å¤šå·¥å…·" color="#5579de" />
+        <QuickAction icon={LayoutGrid} label="¸ü¶à¹¤¾ß" color="#5579de" />
       </section>
     </div>
   );
@@ -802,7 +805,7 @@ function CalendarCard({
         <div>
           <p className="text-xl font-bold">{monthTitle(month)}</p>
           <p className="mt-1 text-sm text-[#8b94a3]">
-            æ¯å¤©çš„æ”¶å…¥å’Œæ”¯å‡ºï¼Œæ„æˆä½ çš„èµ„é‡‘æ½®æ±
+            Ã¿ÌìµÄÊÕÈëºÍÖ§³ö£¬¹¹³ÉÄãµÄ×Ê½ğ³±Ï«
           </p>
         </div>
         <div className="flex gap-2">
@@ -879,7 +882,7 @@ function CalendarGrid({
   return (
     <div>
       <div className="mb-3 grid grid-cols-7 text-center text-xs font-medium text-[#98a1aa]">
-        {["ä¸€", "äºŒ", "ä¸‰", "å››", "äº”", "å…­", "æ—¥"].map((d) => (
+        {["Ò»", "¶ş", "Èı", "ËÄ", "Îå", "Áù", "ÈÕ"].map((d) => (
           <span key={d}>{d}</span>
         ))}
       </div>
@@ -967,12 +970,12 @@ function TransactionsView({
         </button>
         <div>
           <h2 className="text-xl font-bold">
-            {selectedDate ? "å½“å¤©æµæ°´" : "å…¨éƒ¨æµæ°´"}
+            {selectedDate ? "µ±ÌìÁ÷Ë®" : "È«²¿Á÷Ë®"}
           </h2>
           <p className="text-sm text-[#8b94a3]">
             {selectedDate
-              ? `${selectedDate} Â· ${visibleTransactions.length} ç¬”æµæ°´`
-              : `å·²åŠ è½½ ${transactions.length} ç¬”äº‘ç«¯æµæ°´`}
+              ? `${selectedDate} ¡¤ ${visibleTransactions.length} ±ÊÁ÷Ë®`
+              : `ÒÑ¼ÓÔØ ${transactions.length} ±ÊÔÆ¶ËÁ÷Ë®`}
           </p>
         </div>
         {selectedDate && (
@@ -980,7 +983,7 @@ function TransactionsView({
             onClick={onClearDate}
             className="ml-auto rounded-xl bg-white px-3 py-2 text-sm font-medium text-[#0c6f78] shadow-sm"
           >
-            æŸ¥çœ‹å…¨éƒ¨
+            ²é¿´È«²¿
           </button>
         )}
       </section>
@@ -1024,25 +1027,25 @@ function TransactionsView({
                         {item.categoryName ||
                           item.merchantName ||
                           item.note ||
-                          "æœªå‘½åæµæ°´"}
+                          "Î´ÃüÃûÁ÷Ë®"}
                       </p>
                       <p className="mt-0.5 text-xs text-[#8b94a3]">
                         {new Intl.DateTimeFormat("zh-CN", {
                           hour: "2-digit",
                           minute: "2-digit",
                         }).format(new Date(item.occurredAt))}{" "}
-                        Â·{" "}
+                        ¡¤{" "}
                         {item.transactionType === "income"
-                          ? "æ”¶å…¥"
+                          ? "ÊÕÈë"
                           : item.transactionType === "transfer"
-                            ? "è½¬è´¦"
-                            : "æ”¯å‡º"}
+                            ? "×ªÕË"
+                            : "Ö§³ö"}
                       </p>
                     </div>
                     <b
                       className={`money ml-3 shrink-0 text-right ${isIncome ? "text-[#ff714b]" : "text-[#20252b]"}`}
                     >
-                      {isIncome ? "+" : "-"}Â¥{yuan(item.amountCents / 100)}
+                      {isIncome ? "+" : "-"}£¤{yuan(item.amountCents / 100)}
                     </b>
                   </button>
                 );
@@ -1052,7 +1055,7 @@ function TransactionsView({
         ))
       ) : (
         <section className="card p-10 text-center text-sm text-[#8b94a3]">
-          è¿˜æ²¡æœ‰æµæ°´ï¼Œå…ˆå›é¦–é¡µè®°ä¸€ç¬”å§ã€‚
+          »¹Ã»ÓĞÁ÷Ë®£¬ÏÈ»ØÊ×Ò³¼ÇÒ»±Ê°É¡£
         </section>
       )}
     </div>
@@ -1095,7 +1098,7 @@ function ReportTrend({ color, values }: { color: string; values: number[] }) {
       viewBox={`0 0 ${width} ${height}`}
       className="h-44 w-full overflow-visible"
       preserveAspectRatio="none"
-      aria-label="çœŸå®æµæ°´æœˆåº¦è¶‹åŠ¿å›¾"
+      aria-label="ÕæÊµÁ÷Ë®ÔÂ¶ÈÇ÷ÊÆÍ¼"
     >
       {[28, 66, 104, 142].map((y) => (
         <line
@@ -1129,17 +1132,17 @@ function ReportTrend({ color, values }: { color: string; values: number[] }) {
         </>
       ) : (
         <text x="150" y="84" textAnchor="middle" fill="#98a1aa" fontSize="12">
-          æœ¬æœˆæš‚æ— å¯¹åº”æµæ°´
+          ±¾ÔÂÔİÎŞ¶ÔÓ¦Á÷Ë®
         </text>
       )}
       <text x="0" y="164" fill="#a4adb7" fontSize="10">
-        1æ—¥
+        1ÈÕ
       </text>
       <text x="137" y="164" fill="#a4adb7" fontSize="10">
-        æœˆä¸­
+        ÔÂÖĞ
       </text>
       <text x="276" y="164" fill="#a4adb7" fontSize="10">
-        æœˆæœ«
+        ÔÂÄ©
       </text>
     </svg>
   );
@@ -1177,7 +1180,7 @@ function ReportsView({ transactions }: { transactions: LedgerTransaction[] }) {
         day.expense += amount;
         day.expenseCount += 1;
         const category =
-          transaction.categoryName || transaction.merchantName || "æœªåˆ†ç±»";
+          transaction.categoryName || transaction.merchantName || "Î´·ÖÀà";
         categories.set(category, (categories.get(category) ?? 0) + amount);
       }
       if (transaction.transactionType === "income") {
@@ -1222,7 +1225,7 @@ function ReportsView({ transactions }: { transactions: LedgerTransaction[] }) {
       <section className="flex flex-wrap items-center gap-3">
         <div className="flex rounded-xl bg-[#e8eeee] p-1 text-sm">
           <button className="rounded-lg bg-white px-5 py-2 font-semibold text-[#ff714b] shadow-sm">
-            æœˆ
+            ÔÂ
           </button>
         </div>
         <div className="flex items-center rounded-xl bg-white text-sm shadow-sm">
@@ -1243,46 +1246,46 @@ function ReportsView({ transactions }: { transactions: LedgerTransaction[] }) {
           </button>
         </div>
         <p className="ml-auto text-sm text-[#8b94a3]">
-          åŸºäºäº‘ç«¯æµæ°´ Â· {totalCount} ç¬”
+          »ùÓÚÔÆ¶ËÁ÷Ë® ¡¤ {totalCount} ±Ê
         </p>
       </section>
       <section className="grid gap-3 sm:grid-cols-3">
-        <ReportMetric label="æœ¬æœˆæ”¶å…¥" amount={report.income} color="#ff714b" />
+        <ReportMetric label="±¾ÔÂÊÕÈë" amount={report.income} color="#ff714b" />
         <ReportMetric
-          label="æœ¬æœˆæ”¯å‡º"
+          label="±¾ÔÂÖ§³ö"
           amount={report.expense}
           color="#28a99d"
         />
         <ReportMetric
-          label="æœ¬æœˆç»“ä½™"
+          label="±¾ÔÂ½áÓà"
           amount={report.balance}
           color={report.balance >= 0 ? "#5579de" : "#d95d3d"}
         />
       </section>
       <section className="grid gap-5 xl:grid-cols-2">
         <LiveTrendCard
-          title="æ”¯å‡ºè¶‹åŠ¿"
+          title="Ö§³öÇ÷ÊÆ"
           color="#28c5b4"
           rows={expenseRows}
           values={report.daily.map((day) => day.expense)}
           transactionCount={report.expenseCount}
-          transactionLabel="æ”¯å‡º"
+          transactionLabel="Ö§³ö"
         />
         <LiveTrendCard
-          title="æ”¶å…¥è¶‹åŠ¿"
+          title="ÊÕÈëÇ÷ÊÆ"
           color="#ff714b"
           rows={incomeRows}
           values={report.daily.map((day) => day.income)}
           transactionCount={report.incomeCount}
-          transactionLabel="æ”¶å…¥"
+          transactionLabel="ÊÕÈë"
         />
       </section>
       <section className="card soft-shadow p-5 md:p-6">
         <div className="mb-5 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold">åˆ†ç±»æ”¯å‡º</h2>
+            <h2 className="text-lg font-bold">·ÖÀàÖ§³ö</h2>
             <p className="mt-1 text-sm text-[#8b94a3]">
-              æŒ‰æœ¬æœˆçœŸå®æ”¯å‡ºé‡‘é¢æ’åº
+              °´±¾ÔÂÕæÊµÖ§³ö½ğ¶îÅÅĞò
             </p>
           </div>
           <ShoppingBag size={20} className="text-[#28a99d]" />
@@ -1294,7 +1297,7 @@ function ReportsView({ transactions }: { transactions: LedgerTransaction[] }) {
                 <div className="mb-2 flex justify-between gap-4 text-sm">
                   <span className="truncate font-medium">{category.name}</span>
                   <span className="money shrink-0">
-                    Â¥{yuan(category.amount)} Â·{" "}
+                    £¤{yuan(category.amount)} ¡¤{" "}
                     {((category.amount / report.expense) * 100).toFixed(1)}%
                   </span>
                 </div>
@@ -1311,7 +1314,7 @@ function ReportsView({ transactions }: { transactions: LedgerTransaction[] }) {
           </div>
         ) : (
           <p className="rounded-xl bg-[#f5f7f7] px-4 py-8 text-center text-sm text-[#8b94a3]">
-            æœ¬æœˆå°šæ— æ”¯å‡ºæµæ°´ï¼Œè®°ä¸€ç¬”åè¿™é‡Œä¼šè‡ªåŠ¨æ›´æ–°ã€‚
+            ±¾ÔÂÉĞÎŞÖ§³öÁ÷Ë®£¬¼ÇÒ»±ÊºóÕâÀï»á×Ô¶¯¸üĞÂ¡£
           </p>
         )}
       </section>
@@ -1332,7 +1335,7 @@ function ReportMetric({
     <section className="card p-5">
       <p className="text-sm text-[#7d8792]">{label}</p>
       <p className="money mt-2 text-2xl font-bold" style={{ color }}>
-        Â¥{yuan(amount)}
+        £¤{yuan(amount)}
       </p>
     </section>
   );
@@ -1363,16 +1366,16 @@ function LiveTrendCard({
       <ReportTrend color={color} values={values} />
       <div className="mt-3 rounded-xl bg-[#f5f7f7] px-4 py-3 text-sm text-[#65717d]">
         {total > 0
-          ? `${title.replace("è¶‹åŠ¿", "")}å…±è®¡ ${transactionCount} ç¬”ï¼Œé‡‘é¢ Â¥${yuan(total)}`
-          : `æœ¬æœˆæš‚æ— ${transactionLabel}æµæ°´`}
+          ? `${title.replace("Ç÷ÊÆ", "")}¹²¼Æ ${transactionCount} ±Ê£¬½ğ¶î £¤${yuan(total)}`
+          : `±¾ÔÂÔİÎŞ${transactionLabel}Á÷Ë®`}
       </div>
       <div className="mt-3 divide-y divide-[#edf0f0]">
         {rows.length ? (
           rows.map((row) => {
             const amount =
-              transactionLabel === "æ”¯å‡º" ? row.expense : row.income;
+              transactionLabel === "Ö§³ö" ? row.expense : row.income;
             const count =
-              transactionLabel === "æ”¯å‡º" ? row.expenseCount : row.incomeCount;
+              transactionLabel === "Ö§³ö" ? row.expenseCount : row.incomeCount;
             return (
               <div className="flex items-center gap-3 py-3" key={row.day}>
                 <span
@@ -1382,17 +1385,17 @@ function LiveTrendCard({
                   {row.day}
                 </span>
                 <div className="flex-1">
-                  <p className="font-medium">{row.day} æ—¥</p>
+                  <p className="font-medium">{row.day} ÈÕ</p>
                   <p className="text-xs text-[#929ba4]">
-                    {count} ç¬”{transactionLabel}
+                    {count} ±Ê{transactionLabel}
                   </p>
                 </div>
-                <b className="money text-lg">Â¥{yuan(amount)}</b>
+                <b className="money text-lg">£¤{yuan(amount)}</b>
               </div>
             );
           })
         ) : (
-          <p className="py-5 text-center text-sm text-[#98a1aa]">æš‚æ— æ•°æ®</p>
+          <p className="py-5 text-center text-sm text-[#98a1aa]">ÔİÎŞÊı¾İ</p>
         )}
       </div>
     </section>
@@ -1404,9 +1407,9 @@ function LegacyReportsView() {
     <div className="space-y-5">
       <section className="flex flex-wrap items-center gap-3">
         <div className="flex rounded-xl bg-[#e8eeee] p-1 text-sm">
-          <button className="rounded-lg px-5 py-2 text-[#66717d]">å¹´</button>
+          <button className="rounded-lg px-5 py-2 text-[#66717d]">Äê</button>
           <button className="rounded-lg bg-white px-5 py-2 font-semibold text-[#ff714b] shadow-sm">
-            æœˆ
+            ÔÂ
           </button>
         </div>
         <button className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-sm">
@@ -1416,40 +1419,40 @@ function LegacyReportsView() {
         </button>
         <button className="ml-auto flex items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-sm">
           <ListFilter size={16} />
-          ç­›é€‰
+          É¸Ñ¡
         </button>
       </section>
       <section className="flex gap-6 overflow-x-auto border-b border-[#dde7e7] pb-3 text-sm whitespace-nowrap">
-        <b className="border-b-2 border-[#ff714b] pb-3 text-[#20252b]">è¶‹åŠ¿</b>
-        {["å¤§ç±»", "å°ç±»", "æˆå‘˜", "è´¦æˆ·", "å•†å®¶", "æ ‡ç­¾"].map((x) => (
+        <b className="border-b-2 border-[#ff714b] pb-3 text-[#20252b]">Ç÷ÊÆ</b>
+        {["´óÀà", "Ğ¡Àà", "³ÉÔ±", "ÕË»§", "ÉÌ¼Ò", "±êÇ©"].map((x) => (
           <button className="text-[#707b86]" key={x}>
             {x}
           </button>
         ))}
       </section>
       <TrendCard
-        title="æ”¯å‡ºè¶‹åŠ¿"
+        title="Ö§³öÇ÷ÊÆ"
         color="#28c5b4"
-        tooltip="2026å¹´8æœˆ15æ—¥"
+        tooltip="2026Äê8ÔÂ15ÈÕ"
         amount="2,850.45"
-        summary="2026å¹´8æœˆï¼Œæ”¯å‡ºå…±è®¡ 49 ç¬”ï¼Œæ€»æ”¯å‡º 6,345.54"
+        summary="2026Äê8ÔÂ£¬Ö§³ö¹²¼Æ 49 ±Ê£¬×ÜÖ§³ö 6,345.54"
         rows={[
-          ["15", "2026å¹´8æœˆ15æ—¥", "3ç¬”", "2850.45"],
-          ["14", "2026å¹´8æœˆ14æ—¥", "4ç¬”", "75.70"],
-          ["13", "2026å¹´8æœˆ13æ—¥", "1ç¬”", "14.00"],
+          ["15", "2026Äê8ÔÂ15ÈÕ", "3±Ê", "2850.45"],
+          ["14", "2026Äê8ÔÂ14ÈÕ", "4±Ê", "75.70"],
+          ["13", "2026Äê8ÔÂ13ÈÕ", "1±Ê", "14.00"],
         ]}
       />
       <TrendCard
-        title="æ”¶å…¥è¶‹åŠ¿"
+        title="ÊÕÈëÇ÷ÊÆ"
         color="#ff714b"
         income
-        tooltip="2026å¹´8æœˆ15æ—¥"
+        tooltip="2026Äê8ÔÂ15ÈÕ"
         amount="21,089.00"
-        summary="2026å¹´8æœˆï¼Œæ”¶å…¥å…±è®¡ 3 ç¬”ï¼Œæ€»æ”¶å…¥ 23,339.00"
+        summary="2026Äê8ÔÂ£¬ÊÕÈë¹²¼Æ 3 ±Ê£¬×ÜÊÕÈë 23,339.00"
         rows={[
-          ["23", "2026å¹´8æœˆ23æ—¥", "1ç¬”", "250.00"],
-          ["15", "2026å¹´8æœˆ15æ—¥", "1ç¬”", "21,089.00"],
-          ["1", "2026å¹´8æœˆ1æ—¥", "1ç¬”", "2,000.00"],
+          ["23", "2026Äê8ÔÂ23ÈÕ", "1±Ê", "250.00"],
+          ["15", "2026Äê8ÔÂ15ÈÕ", "1±Ê", "21,089.00"],
+          ["1", "2026Äê8ÔÂ1ÈÕ", "1±Ê", "2,000.00"],
         ]}
       />
     </div>
@@ -1517,19 +1520,19 @@ function TrendCard({
 
 function AccountsView() {
   const accounts = [
-    ["å¾®ä¿¡æ”¯ä»˜", "2,867.20", "#28c5b4", Sparkles],
-    ["æ”¯ä»˜å®", "4,128.63", "#5579de", Landmark],
-    ["æ‹›å•†é“¶è¡Œ", "18,053.70", "#ff714b", Landmark],
-    ["ç°é‡‘", "350.00", "#f49a5d", WalletCards],
+    ["Î¢ĞÅÖ§¸¶", "2,867.20", "#28c5b4", Sparkles],
+    ["Ö§¸¶±¦", "4,128.63", "#5579de", Landmark],
+    ["ÕĞÉÌÒøĞĞ", "18,053.70", "#ff714b", Landmark],
+    ["ÏÖ½ğ", "350.00", "#f49a5d", WalletCards],
   ];
   return (
     <div className="space-y-5">
       <section className="ripple-grid rounded-[28px] bg-[#0c6f78] p-7 text-white">
-        <p className="text-sm text-[#c1e9e4]">æ€»èµ„äº§</p>
-        <p className="money mt-2 text-4xl font-bold">Â¥25,399.53</p>
+        <p className="text-sm text-[#c1e9e4]">×Ü×Ê²ú</p>
+        <p className="money mt-2 text-4xl font-bold">£¤25,399.53</p>
         <div className="mt-5 flex gap-6 text-sm">
-          <span>è´Ÿå€º Â¥0.00</span>
-          <span>å‡€èµ„äº§ Â¥25,399.53</span>
+          <span>¸ºÕ® £¤0.00</span>
+          <span>¾»×Ê²ú £¤25,399.53</span>
         </div>
       </section>
       <section className="grid gap-4 sm:grid-cols-2">
@@ -1548,7 +1551,7 @@ function AccountsView() {
               </div>
               <p className="mt-5 font-medium">{name as string}</p>
               <p className="money mt-1 text-2xl font-bold">
-                Â¥{money as string}
+                £¤{money as string}
               </p>
             </div>
           );
@@ -1558,61 +1561,109 @@ function AccountsView() {
   );
 }
 
-function PlansView() {
+type RecurringStore = ReturnType<typeof useRecurringEntries>;
+
+function recurringLabel(entry: Pick<RecurringEntry, "intervalCount" | "intervalUnit">) {
+  const unit = entry.intervalUnit === "day" ? "Ìì" : entry.intervalUnit === "week" ? "ÖÜ" : entry.intervalUnit === "month" ? "ÔÂ" : "Äê";
+  return entry.intervalCount === 1 ? `Ã¿${unit}` : `Ã¿ ${entry.intervalCount} ${unit}`;
+}
+
+function PlansView({ recurring, categories, accounts }: { recurring: RecurringStore; categories: LedgerCategory[]; accounts: { id: string; name: string; color: string }[] }) {
+  const [tab, setTab] = useState<"active" | "ended">("active");
+  const [formOpen, setFormOpen] = useState(false);
+  const [selected, setSelected] = useState<RecurringEntry | null>(null);
+  const [detail, setDetail] = useState<(RecurringEntry & { generated: { id: string; occurredAt: string; amountCents: number; note: string | null }[] }) | null>(null);
+  const [message, setMessage] = useState("");
+  const entries = tab === "active" ? recurring.active : recurring.ended;
+  const openDetail = async (entry: RecurringEntry) => {
+    try { setDetail(await recurring.get(entry.id)); }
+    catch (error) { setMessage(error instanceof Error ? error.message : "¶ÁÈ¡ÏêÇéÊ§°Ü"); }
+  };
+  const end = async (id: string) => {
+    if (!window.confirm("½áÊøºó½«²»ÔÙÉú³ÉÎ´À´Á÷Ë®£¬ÒÑÉú³ÉÁ÷Ë®»á±£Áô¡£È·ÈÏ½áÊø£¿")) return;
+    try { await recurring.end(id); setDetail(null); setMessage("ÖÜÆÚÕËÒÑ½áÊø"); }
+    catch (error) { setMessage(error instanceof Error ? error.message : "²Ù×÷Ê§°Ü"); }
+  };
+  const archive = async (id: string) => {
+    if (!window.confirm("É¾³ı»á¹éµµÖÜÆÚ¹æÔò£¬ÒÑÉú³ÉÁ÷Ë®²»»áÉ¾³ı¡£È·ÈÏ¼ÌĞø£¿")) return;
+    try { await recurring.archive(id); setDetail(null); setMessage("ÖÜÆÚÕËÒÑ¹éµµ"); }
+    catch (error) { setMessage(error instanceof Error ? error.message : "²Ù×÷Ê§°Ü"); }
+  };
   return (
-    <div className="grid gap-5 lg:grid-cols-[1.2fr_.8fr]">
-      <section className="card soft-shadow p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xl font-bold">å…«æœˆé¢„ç®—</p>
-            <p className="mt-1 text-sm text-[#8b94a3]">æ§åˆ¶èŠ‚å¥ï¼Œä¸æ§åˆ¶ç”Ÿæ´»</p>
-          </div>
-          <Settings2 size={19} className="text-[#7d8792]" />
-        </div>
-        <div className="mt-8 flex items-end justify-between">
-          <div>
-            <p className="text-sm text-[#8b94a3]">å·²ä½¿ç”¨</p>
-            <p className="money mt-1 text-3xl font-bold">Â¥6,345.54</p>
-          </div>
-          <p className="text-right text-sm text-[#8b94a3]">
-            æ€»é¢„ç®—
-            <br />
-            <b className="money text-xl text-[#20252b]">Â¥10,000.00</b>
-          </p>
-        </div>
-        <div className="mt-6 h-3 overflow-hidden rounded-full bg-[#edf1f1]">
-          <div className="h-full w-[63.5%] rounded-full bg-[#28c5b4]" />
-        </div>
-        <div className="mt-3 flex justify-between text-sm">
-          <span className="text-[#28a99d]">ä»æœ‰ Â¥3,654.46 å¯ç”¨</span>
-          <span className="text-[#8b94a3]">63.45%</span>
-        </div>
+    <div className="mx-auto max-w-3xl space-y-5">
+      <section className="card soft-shadow overflow-hidden">
+        <div className="flex items-center justify-between border-b border-[#edf0f0] px-5 py-5 md:px-6"><div><h2 className="text-xl font-bold">ÖÜÆÚÕË¹ÜÀí</h2><p className="mt-1 text-sm text-[#8b94a3]">¹Ì¶¨µÄÊÕÈëºÍÖ§³ö£¬µ½ÆÚ×Ô¶¯ÈëÕË</p></div><button onClick={() => { setSelected(null); setFormOpen(true); }} className="rounded-xl bg-[#ff714b] px-4 py-2.5 text-sm font-bold text-white"><Plus className="mr-1 inline" size={17} />Ìí¼Ó</button></div>
+        <div className="flex border-b border-[#edf0f0] px-5 md:px-6"><button onClick={() => setTab("active")} className={`border-b-2 px-1 py-3 text-sm font-bold ${tab === "active" ? "border-[#0c6f78] text-[#0c6f78]" : "border-transparent text-[#8b94a3]"}`}>½øĞĞÖĞ {recurring.active.length}</button><button onClick={() => setTab("ended")} className={`ml-6 border-b-2 px-1 py-3 text-sm font-bold ${tab === "ended" ? "border-[#ff714b] text-[#ff714b]" : "border-transparent text-[#8b94a3]"}`}>ÒÑÖÕÖ¹ {recurring.ended.length}</button></div>
+        <div className="divide-y divide-[#edf0f0]">{recurring.loading ? <p className="p-8 text-center text-sm text-[#8b94a3]">ÕıÔÚ¶ÁÈ¡ÖÜÆÚÕË¡­</p> : entries.length ? entries.map((entry) => <RecurringRow entry={entry} key={entry.id} onClick={() => void openDetail(entry)} />) : <div className="p-10 text-center"><Clock3 className="mx-auto text-[#aab4bd]" size={30} /><p className="mt-3 font-medium">{tab === "active" ? "»¹Ã»ÓĞ½øĞĞÖĞµÄÖÜÆÚÕË" : "Ã»ÓĞÒÑÖÕÖ¹µÄÖÜÆÚÕË"}</p><p className="mt-1 text-sm text-[#8b94a3]">ÀıÈçÃ¿ÔÂ·¿×â¡¢¹¤×Ê¡¢¶©ÔÄ·ÑÓÃ¡£</p></div>}</div>
       </section>
-      <section className="card p-6">
-        <p className="font-bold">æœ¬æœˆæé†’</p>
-        <div className="mt-5 space-y-4">
-          <div className="flex items-center gap-3">
-            <span className="grid size-9 place-items-center rounded-xl bg-[#fff0eb] text-[#ff714b]">
-              <CalendarDays size={18} />
-            </span>
-            <div>
-              <p className="text-sm font-medium">æˆ¿ç§Ÿå°†åœ¨ 3 å¤©åç”Ÿæˆ</p>
-              <p className="text-xs text-[#8b94a3]">æ¯æœˆ 1 æ—¥ Â· Â¥3,500.00</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="grid size-9 place-items-center rounded-xl bg-[#e8f6f4] text-[#0c6f78]">
-              <Target size={18} />
-            </span>
-            <div>
-              <p className="text-sm font-medium">æ—…è¡ŒåŸºé‡‘å·²å®Œæˆ 62%</p>
-              <p className="text-xs text-[#8b94a3]">ç›®æ ‡ Â¥12,000.00</p>
-            </div>
-          </div>
-        </div>
-      </section>
+      {recurring.error && <p className="rounded-xl bg-[#fff0ed] px-4 py-3 text-sm text-[#c54c2c]">{recurring.error}</p>}
+      {message && <p className="rounded-xl bg-[#eaf8f6] px-4 py-3 text-sm text-[#0c6f78]">{message}</p>}
+      {formOpen && <RecurringForm entry={selected} categories={categories} accounts={accounts} onClose={() => setFormOpen(false)} onSave={async (input) => { if (selected) await recurring.update(selected.id, input); else await recurring.create(input); setFormOpen(false); setMessage(selected ? "ÖÜÆÚÕËÒÑ¸üĞÂ" : "ÖÜÆÚÕËÒÑ´´½¨"); }} />}
+      {detail && <RecurringDetail detail={detail} onClose={() => setDetail(null)} onEdit={() => { setSelected(detail); setDetail(null); setFormOpen(true); }} onEnd={() => void end(detail.id)} onArchive={() => void archive(detail.id)} />}
     </div>
   );
+}
+
+function RecurringRow({ entry, onClick }: { entry: RecurringEntry; onClick: () => void }) {
+  const Icon = categoryIcon(entry.categoryIcon);
+  const income = entry.transactionType === "income";
+  return <button onClick={onClick} className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-[#fafcfc] md:px-6"><span className={`grid size-11 place-items-center rounded-2xl ${income ? "bg-[#fff0eb] text-[#ff714b]" : "bg-[#e4f7f4] text-[#28b9aa]"}`}><Icon size={21} /></span><div className="min-w-0 flex-1"><p className="font-semibold">{entry.categoryName}</p><p className="mt-1 truncate text-sm text-[#8b94a3]">{entry.note || "ÎŞ±¸×¢"}</p><p className="mt-1 text-xs text-[#a2abb4]">{entry.status === "active" ? `ÏÂ´Î ${new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(entry.nextRunAt))}` : "ÒÑÖÕÖ¹"} ¡¤ {recurringLabel(entry)}</p></div><b className={`money text-xl ${income ? "text-[#ff714b]" : "text-[#20252b]"}`}>{income ? "+" : "-"}£¤{yuan(entry.amountCents / 100)}</b><ChevronRight className="text-[#a5adb6]" size={18} /></button>;
+}
+
+function toDateTimeLocal(value: string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function RecurringForm({ entry, categories, accounts, onClose, onSave }: {
+  entry: RecurringEntry | null;
+  categories: LedgerCategory[];
+  accounts: { id: string; name: string; color: string }[];
+  onClose: () => void;
+  onSave: (input: RecurringInput) => Promise<void>;
+}) {
+  const [kind, setKind] = useState<"expense" | "income">(entry?.transactionType ?? "expense");
+  const [categoryId, setCategoryId] = useState(entry?.categoryId ?? "");
+  const expenseRoots = categories.filter((category) => category.kind === "expense" && !category.parentId);
+  const [activeExpenseParentId, setActiveExpenseParentId] = useState(() => {
+    const selected = categories.find((category) => category.id === entry?.categoryId);
+    return selected?.parentId ?? expenseRoots[0]?.id ?? "";
+  });
+  const expenseChildren = categories.filter((category) => category.kind === "expense" && category.parentId === activeExpenseParentId);
+  const incomeCategories = categories.filter((category) => category.kind === "income" && !category.parentId);
+  const [accountId, setAccountId] = useState(entry?.accountId ?? "");
+  const [amount, setAmount] = useState(entry ? String(entry.amountCents / 100) : "");
+  const [note, setNote] = useState(entry?.note ?? "");
+  const [intervalCount, setIntervalCount] = useState(String(entry?.intervalCount ?? 1));
+  const [intervalUnit, setIntervalUnit] = useState<RecurringInput["intervalUnit"]>(entry?.intervalUnit ?? "month");
+  const [startAt, setStartAt] = useState(toDateTimeLocal(entry?.startAt) || toDateTimeLocal(new Date().toISOString()));
+  const [hasEndAt, setHasEndAt] = useState(Boolean(entry?.endAt));
+  const [endAt, setEndAt] = useState(toDateTimeLocal(entry?.endAt));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const setTransactionKind = (next: "expense" | "income") => { setKind(next); setCategoryId(""); };
+  const submit = async () => {
+    const amountCents = Math.round(Number(amount) * 100);
+    const count = Number(intervalCount);
+    if (!categoryId) { setError("ÇëÑ¡Ôñ·ÖÀà¡£"); return; }
+    if (!Number.isFinite(amountCents) || amountCents <= 0) { setError("ÇëÊäÈë´óÓÚ 0 µÄ½ğ¶î¡£"); return; }
+    if (!startAt) { setError("ÇëÑ¡Ôñ¿ªÊ¼Ê±¼ä¡£"); return; }
+    setSaving(true); setError("");
+    try { await onSave({ transactionType: kind, categoryId, accountId: accountId || null, amountCents, note, intervalCount: count, intervalUnit, startAt: new Date(startAt).toISOString(), endAt: hasEndAt && endAt ? new Date(endAt).toISOString() : null }); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "±£´æÊ§°Ü¡£"); }
+    finally { setSaving(false); }
+  };
+  return <div className="fixed inset-0 z-50 flex items-end bg-[#102124]/35 p-0 backdrop-blur-sm md:items-center md:justify-center md:p-5"><section className="max-h-[100dvh] w-full overflow-y-auto rounded-t-[28px] bg-[#f5f7f7] shadow-2xl md:max-w-[620px] md:rounded-[28px]"><header className="flex items-center justify-between bg-[#0c6f78] px-5 py-5 text-white md:px-6"><div><p className="text-lg font-bold">{entry ? "±à¼­ÖÜÆÚÕË" : "ĞÂÔöÖÜÆÚÕË"}</p><p className="mt-1 text-sm text-white/70">µ½ÆÚºó»á×Ô¶¯Éú³ÉÒ»±ÊÁ÷Ë®</p></div><button onClick={onClose} disabled={saving} className="grid size-9 place-items-center rounded-full bg-white/10"><X size={19} /></button></header><div className="space-y-5 p-5 md:p-6"><div className="grid grid-cols-2 rounded-2xl bg-[#e8eeee] p-1"><button onClick={() => setTransactionKind("expense")} disabled={saving} className={`rounded-xl py-2.5 text-sm font-bold ${kind === "expense" ? "bg-white text-[#0c6f78] shadow-sm" : "text-[#84909a]"}`}>Ö§³ö</button><button onClick={() => setTransactionKind("income")} disabled={saving} className={`rounded-xl py-2.5 text-sm font-bold ${kind === "income" ? "bg-white text-[#ff714b] shadow-sm" : "text-[#84909a]"}`}>ÊÕÈë</button></div><section><div className="flex items-baseline justify-between"><p className="text-sm font-bold text-[#4d5863]">·ÖÀà</p><p className="text-xs text-[#98a1aa]">{kind === "expense" ? "ÏÈÑ¡´óÀà£¬ÔÙÑ¡Ğ¡Àà" : "Ñ¡ÔñÊÕÈë·ÖÀà"}</p></div>{kind === "expense" ? <div className="mt-2 space-y-3"><div className="flex gap-2 overflow-x-auto pb-1">{expenseRoots.map((category) => { const Icon = categoryIcon(category.icon); const selected = category.id === activeExpenseParentId; return <button key={category.id} onClick={() => { setActiveExpenseParentId(category.id); if (categories.find((item) => item.id === categoryId)?.parentId !== category.id) setCategoryId(""); }} disabled={saving} className={`flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold transition ${selected ? "border-[#28c5b4] bg-[#e4f7f4] text-[#0c6f78]" : "border-[#dde5e5] bg-white text-[#66727d]"}`}><Icon size={16} />{category.name}</button>; })}</div><div className="rounded-2xl bg-white p-3"><p className="mb-2 text-xs font-bold text-[#8b94a3]">Ñ¡ÔñĞ¡Àà</p><div className="grid grid-cols-3 gap-2 sm:grid-cols-4">{expenseChildren.map((category) => { const Icon = categoryIcon(category.icon); const selected = category.id === categoryId; return <button key={category.id} onClick={() => setCategoryId(category.id)} disabled={saving} className={`grid min-h-20 place-items-center gap-1 rounded-xl border px-1 py-2 text-xs font-medium transition ${selected ? "border-[#28c5b4] bg-[#e4f7f4] text-[#0c6f78]" : "border-[#edf0f0] text-[#66727d] hover:bg-[#f8fbfb]"}`}><Icon size={18} /><span className="max-w-full truncate">{category.name}</span></button>; })}</div>{!expenseChildren.length && <p className="py-4 text-center text-sm text-[#8b94a3]">Õâ¸ö´óÀà»¹Ã»ÓĞĞ¡Àà£¬ÇëÏÈµ½·ÖÀà¹ÜÀíÖĞÌí¼Ó¡£</p>}</div></div> : <div className="mt-2 grid grid-cols-3 gap-2 rounded-2xl bg-white p-3 sm:grid-cols-4">{incomeCategories.map((category) => { const Icon = categoryIcon(category.icon); const selected = category.id === categoryId; return <button key={category.id} onClick={() => setCategoryId(category.id)} disabled={saving} className={`grid min-h-20 place-items-center gap-1 rounded-xl border px-1 py-2 text-xs font-medium transition ${selected ? "border-[#ff714b] bg-[#fff0eb] text-[#ff714b]" : "border-[#edf0f0] text-[#66727d] hover:bg-[#fff9f7]"}`}><Icon size={18} /><span className="max-w-full truncate">{category.name}</span></button>; })}</div>}</section><div className="grid gap-4 sm:grid-cols-2"><label className="block text-sm font-bold text-[#4d5863]">½ğ¶î<input value={amount} onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="0.00" disabled={saving} className="money mt-2 w-full rounded-xl border border-[#dde5e5] bg-white px-3 py-3 text-xl font-bold outline-none" /></label><label className="block text-sm font-bold text-[#4d5863]">ÕË»§£¨¿ÉÑ¡£©<select value={accountId} onChange={(event) => setAccountId(event.target.value)} disabled={saving} className="mt-2 w-full rounded-xl border border-[#dde5e5] bg-white px-3 py-3 font-normal outline-none"><option value="">²»Ö¸¶¨ÕË»§</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label></div><label className="block text-sm font-bold text-[#4d5863]">¿ªÊ¼Ê±¼ä<input value={startAt} onChange={(event) => setStartAt(event.target.value)} type="datetime-local" disabled={saving} className="mt-2 w-full rounded-xl border border-[#dde5e5] bg-white px-3 py-3 font-normal outline-none" /></label><div><p className="text-sm font-bold text-[#4d5863]">ÖØ¸´ÖÜÆÚ</p><div className="mt-2 flex gap-2"><input value={intervalCount} onChange={(event) => setIntervalCount(event.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" disabled={saving} className="w-24 rounded-xl border border-[#dde5e5] bg-white px-3 py-3 text-center font-bold outline-none" /><select value={intervalUnit} onChange={(event) => setIntervalUnit(event.target.value as RecurringInput["intervalUnit"])} disabled={saving} className="flex-1 rounded-xl border border-[#dde5e5] bg-white px-3 py-3 outline-none"><option value="day">Ìì</option><option value="week">ÖÜ</option><option value="month">ÔÂ</option><option value="year">Äê</option></select></div></div><div className="rounded-2xl bg-white p-4"><label className="flex items-center justify-between gap-3 text-sm font-bold text-[#4d5863]"><span>ÉèÖÃ½áÊøÊ±¼ä</span><input checked={hasEndAt} onChange={(event) => setHasEndAt(event.target.checked)} disabled={saving} className="size-4 accent-[#0c6f78]" type="checkbox" /></label>{hasEndAt && <input value={endAt} onChange={(event) => setEndAt(event.target.value)} type="datetime-local" disabled={saving} className="mt-3 w-full rounded-xl border border-[#dde5e5] px-3 py-3 font-normal outline-none" />}</div><label className="block text-sm font-bold text-[#4d5863]">±¸×¢<input value={note} onChange={(event) => setNote(event.target.value)} disabled={saving} placeholder="ÀıÈç£ºÃ¿ÔÂ·¿×â" className="mt-2 w-full rounded-xl border border-[#dde5e5] bg-white px-3 py-3 font-normal outline-none" /></label>{error && <p className="rounded-xl bg-[#fff0ed] px-3 py-2 text-sm text-[#c54c2c]">{error}</p>}<button onClick={() => void submit()} disabled={saving} className="w-full rounded-2xl bg-[#0c6f78] py-3.5 font-bold text-white disabled:opacity-60">{saving ? "ÕıÔÚ±£´æ¡­" : "±£´æÖÜÆÚÕË"}</button></div></section></div>;
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) { return <div className="flex items-center justify-between gap-5 py-3 text-sm"><span className="text-[#8b94a3]">{label}</span><span className="text-right font-medium text-[#3f4852]">{value}</span></div>; }
+
+function RecurringDetail({ detail, onClose, onEdit, onEnd, onArchive }: { detail: RecurringEntry & { generated: { id: string; occurredAt: string; amountCents: number; note: string | null }[] }; onClose: () => void; onEdit: () => void; onEnd: () => void; onArchive: () => void }) {
+  const income = detail.transactionType === "income"; const Icon = categoryIcon(detail.categoryIcon); const formatDate = (value: string) => new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-[#102124]/35 p-4 backdrop-blur-sm"><section className="max-h-[90dvh] w-full max-w-[580px] overflow-y-auto rounded-[28px] bg-[#f5f7f7] shadow-2xl"><header className="flex items-center justify-between bg-[#0c6f78] px-6 py-5 text-white"><div><p className="text-lg font-bold">ÖÜÆÚÕËÏêÇé</p><p className="mt-1 text-sm text-white/70">{detail.status === "active" ? "ÕıÔÚ½øĞĞ" : "ÒÑÖÕÖ¹"}</p></div><button onClick={onClose} className="grid size-9 place-items-center rounded-full bg-white/10"><X size={19} /></button></header><div className="space-y-4 p-5 md:p-6"><section className="rounded-2xl bg-white p-5"><div className="flex items-center gap-3"><span className={`grid size-12 place-items-center rounded-2xl ${income ? "bg-[#fff0eb] text-[#ff714b]" : "bg-[#e4f7f4] text-[#28b9aa]"}`}><Icon size={23} /></span><div className="min-w-0 flex-1"><p className="font-bold">{detail.categoryName}</p><p className="mt-1 text-sm text-[#8b94a3]">{detail.note || "ÎŞ±¸×¢"}</p></div><b className={`money text-2xl ${income ? "text-[#ff714b]" : "text-[#20252b]"}`}>{income ? "+" : "-"}£¤{yuan(detail.amountCents / 100)}</b></div><div className="mt-4 divide-y divide-[#edf0f0]"><DetailRow label="ÕË»§" value={detail.accountName || "Î´Ö¸¶¨ÕË»§"} /><DetailRow label="ÖØ¸´" value={recurringLabel(detail)} /><DetailRow label="¿ªÊ¼" value={formatDate(detail.startAt)} /><DetailRow label="ÏÂ´ÎÈëÕË" value={detail.status === "active" ? formatDate(detail.nextRunAt) : "ÒÑ½áÊø"} />{detail.endAt && <DetailRow label="½áÊøÊ±¼ä" value={formatDate(detail.endAt)} />}</div></section><section className="rounded-2xl bg-white p-5"><div className="flex items-center justify-between"><p className="font-bold">ÒÑÉú³ÉÁ÷Ë®</p><span className="text-sm text-[#8b94a3]">¹² {detail.generated.length} ±Ê</span></div>{detail.generated.length ? <div className="mt-3 divide-y divide-[#edf0f0]">{detail.generated.slice(0, 5).map((item) => <div key={item.id} className="flex items-center justify-between py-3 text-sm"><span className="text-[#68737d]">{new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(item.occurredAt))}</span><b className={`money ${income ? "text-[#ff714b]" : "text-[#20252b]"}`}>{income ? "+" : "-"}£¤{yuan(item.amountCents / 100)}</b></div>)}</div> : <p className="mt-3 text-sm text-[#8b94a3]">ÉĞÎ´µ½Éú³ÉÊ±¼ä¡£</p>}</section><div className="grid gap-3 sm:grid-cols-2"><button onClick={onEdit} className="rounded-2xl bg-[#0c6f78] py-3 font-bold text-white">±à¼­</button>{detail.status === "active" ? <button onClick={onEnd} className="rounded-2xl border border-[#f2c1b6] bg-[#fff8f6] py-3 font-bold text-[#d55a3e]">½áÊøÖÜÆÚÕË</button> : <button onClick={onArchive} className="rounded-2xl border border-[#e1e5e6] bg-white py-3 font-bold text-[#68737d]">¹éµµ¹æÔò</button>}</div>{detail.status === "active" && <button onClick={onArchive} className="w-full py-2 text-sm font-medium text-[#9aa4ad] underline underline-offset-4">É¾³ı²¢¹éµµ´Ë¹æÔò</button>}</div></section></div>;
 }
 
 function Composer({
@@ -1665,14 +1716,14 @@ function Composer({
   const [activeParentId, setActiveParentId] = useState<string | null>(null);
   const [adminMode, setAdminMode] = useState<"manage" | "new" | null>(null);
   const tabs: [TransactionKind, string, typeof ArrowDownLeft][] = [
-    ["expense", "æ”¯å‡º", ArrowUpRight],
-    ["income", "æ”¶å…¥", ArrowDownLeft],
+    ["expense", "Ö§³ö", ArrowUpRight],
+    ["income", "ÊÕÈë", ArrowDownLeft],
   ];
   const keypad = [
     "1",
     "2",
     "3",
-    "âŒ«",
+    "?",
     "4",
     "5",
     "6",
@@ -1726,7 +1777,7 @@ function Composer({
               <X size={20} />
             </button>
             <button className="flex items-center gap-1 font-semibold">
-              {editing ? "ç¼–è¾‘æµæ°´" : "æ—¥å¸¸è´¦æœ¬"} <ChevronDown size={15} />
+              {editing ? "±à¼­Á÷Ë®" : "ÈÕ³£ÕË±¾"} <ChevronDown size={15} />
             </button>
             <button className="grid size-9 place-items-center rounded-full bg-white/10">
               <Settings2 size={18} />
@@ -1761,7 +1812,7 @@ function Composer({
             disabled={saving}
             className="flex min-w-0 items-center gap-1 text-left text-lg font-bold"
           >
-            <span className="truncate">{selectedCategory?.name ?? "é€‰æ‹©åˆ†ç±»"}</span>
+            <span className="truncate">{selectedCategory?.name ?? "Ñ¡Ôñ·ÖÀà"}</span>
             <ChevronDown size={16} />
           </button>
           <input
@@ -1769,7 +1820,7 @@ function Composer({
             onChange={(event) => onAmountChange(event.target.value)}
             inputMode="decimal"
             pattern="[0-9]*[.]?[0-9]*"
-            aria-label="é‡‘é¢"
+            aria-label="½ğ¶î"
             style={{ fontSize: "2.25rem", fontWeight: 700, lineHeight: 1 }}
             className="money ml-auto min-w-0 flex-1 bg-transparent text-right text-4xl font-bold text-[#20252b] outline-none"
           />
@@ -1805,7 +1856,7 @@ function Composer({
               <span className="grid size-11 place-items-center rounded-2xl bg-[#e9edef] text-[#778391]">
                 <MoreHorizontal size={22} />
               </span>
-              <span>å…¨éƒ¨</span>
+              <span>È«²¿</span>
             </button>
           </div>
           <input
@@ -1813,10 +1864,10 @@ function Composer({
             onChange={(event) => setNote(event.target.value)}
             disabled={saving}
             className="mt-10 w-full bg-transparent text-base outline-none placeholder:text-[#a7b0bb]"
-            placeholder="è¾“å…¥å¤‡æ³¨â€¦"
+            placeholder="ÊäÈë±¸×¢¡­"
           />
           <div className="mt-5 flex gap-2 overflow-x-auto pb-2">
-            {["ä»Šå¤© 13:00", "æ”¯ä»˜å®", "è‡ªå·±", "å•†å®¶", "æ ‡ç­¾"].map(
+            {["½ñÌì 13:00", "Ö§¸¶±¦", "×Ô¼º", "ÉÌ¼Ò", "±êÇ©"].map(
               (item, index) => (
                 <button
                   className="shrink-0 rounded-full bg-white px-3 py-2 text-sm text-[#53606b] shadow-sm"
@@ -1845,7 +1896,7 @@ function Composer({
               className="h-[56px] border-b border-r border-[#566071] text-xl transition hover:bg-[#4d5666] active:bg-[#586273] md:h-[62px]"
               key={key}
             >
-              {key === "clear" ? "æ¸…ç©º" : key}
+              {key === "clear" ? "Çå¿Õ" : key}
             </button>
           ))}
           <button
@@ -1853,7 +1904,7 @@ function Composer({
             disabled={saving}
             className="col-span-3 h-[56px] bg-[#ff714b] text-lg font-bold transition hover:bg-[#f7653f] active:bg-[#e95a37] disabled:cursor-wait disabled:opacity-70 md:h-[62px]"
           >
-            {saving ? "ä¿å­˜ä¸­â€¦" : editing ? "ä¿å­˜ä¿®æ”¹" : "ä¿å­˜"}
+            {saving ? "±£´æÖĞ¡­" : editing ? "±£´æĞŞ¸Ä" : "±£´æ"}
           </button>
         </div>
       </section>
@@ -1871,7 +1922,7 @@ function Composer({
                 <ChevronLeft size={20} />
               </button>
               <div className="text-center">
-                <p className="font-bold">é€‰æ‹©åˆ†ç±»</p>
+                <p className="font-bold">Ñ¡Ôñ·ÖÀà</p>
                 {activeParent && <p className="text-xs text-[#8b94a3]">{activeParent.name}</p>}
               </div>
               <button onClick={() => setPickerOpen(false)} className="grid size-9 place-items-center rounded-full bg-[#f2f5f5]">
@@ -1892,17 +1943,17 @@ function Composer({
                       <Icon size={20} />
                     </span>
                     <span className="flex-1 font-medium">{category.name}</span>
-                    {isParent ? <ChevronRight size={18} className="text-[#a5adb6]" /> : category.id === selectedCategoryId ? <span className={`text-sm font-bold ${selectedTextStyle}`}>å·²é€‰</span> : null}
+                    {isParent ? <ChevronRight size={18} className="text-[#a5adb6]" /> : category.id === selectedCategoryId ? <span className={`text-sm font-bold ${selectedTextStyle}`}>ÒÑÑ¡</span> : null}
                   </button>
                 );
               })}
               {!pickerItems.length && (
-                <p className="py-10 text-center text-sm text-[#8b94a3]">å½“å‰å¤§ç±»è¿˜æ²¡æœ‰å°ç±»ã€‚</p>
+                <p className="py-10 text-center text-sm text-[#8b94a3]">µ±Ç°´óÀà»¹Ã»ÓĞĞ¡Àà¡£</p>
               )}
             </div>
             <footer className="flex border-t border-[#edf0f0] text-[#ff714b]">
-              <button onClick={() => setAdminMode("new")} className="flex-1 py-4 text-sm font-bold">+ æ–°å¢åˆ†ç±»</button>
-              <button onClick={() => setAdminMode("manage")} className="flex-1 border-l border-[#edf0f0] py-4 text-sm font-bold">ç®¡ç†</button>
+              <button onClick={() => setAdminMode("new")} className="flex-1 py-4 text-sm font-bold">+ ĞÂÔö·ÖÀà</button>
+              <button onClick={() => setAdminMode("manage")} className="flex-1 border-l border-[#edf0f0] py-4 text-sm font-bold">¹ÜÀí</button>
             </footer>
           </section>
         </div>
@@ -1956,20 +2007,20 @@ function CategoryAdminDialog({
   onCreated: (category: LedgerCategory) => void;
 }) {
   const iconChoices = [
-    ["shopping-bag", "è´­ç‰©"],
-    ["utensils", "é¤é¥®"],
-    ["car", "äº¤é€š"],
-    ["home", "å±…å®¶"],
-    ["heart", "äººæƒ…"],
-    ["wallet", "æ”¶å…¥"],
-    ["badge-plus", "æ–°å¢"],
-    ["trending-up", "æŠ•èµ„"],
-    ["sparkles", "å¨±ä¹"],
-    ["zap", "æ•°ç "],
-    ["coffee", "å’–å•¡"],
-    ["plane", "å‡ºè¡Œ"],
-    ["bike", "éª‘è¡Œ"],
-    ["shirt", "æœé¥°"],
+    ["shopping-bag", "¹ºÎï"],
+    ["utensils", "²ÍÒû"],
+    ["car", "½»Í¨"],
+    ["home", "¾Ó¼Ò"],
+    ["heart", "ÈËÇé"],
+    ["wallet", "ÊÕÈë"],
+    ["badge-plus", "ĞÂÔö"],
+    ["trending-up", "Í¶×Ê"],
+    ["sparkles", "ÓéÀÖ"],
+    ["zap", "ÊıÂë"],
+    ["coffee", "¿§·È"],
+    ["plane", "³öĞĞ"],
+    ["bike", "ÆïĞĞ"],
+    ["shirt", "·şÊÎ"],
   ] as const;
   const [mode, setMode] = useState<"manage" | "form">(startMode === "new" ? "form" : "manage");
   const [kind, setKind] = useState<TransactionKind>(initialKind);
@@ -1995,14 +2046,14 @@ function CategoryAdminDialog({
       const input = { name, kind, parentId: kind === "income" ? null : parentId, icon, color: kind === "income" ? "#ff714b" : "#28c5b4" };
       const category = editing ? await updateCategory(editing.id, input) : await createCategory(input);
       if (!editing) onCreated(category);
-      else { setMessage("å·²ä¿å­˜"); setMode("manage"); }
-    } catch (error) { setMessage(error instanceof Error ? error.message : "ä¿å­˜å¤±è´¥"); }
+      else { setMessage("ÒÑ±£´æ"); setMode("manage"); }
+    } catch (error) { setMessage(error instanceof Error ? error.message : "±£´æÊ§°Ü"); }
     finally { setSaving(false); }
   };
   const archive = async (category: LedgerCategory) => {
-    if (!window.confirm(`å½’æ¡£â€œ${category.name}â€ï¼Ÿå†å²æµæ°´ä¼šä¿ç•™è¯¥åˆ†ç±»ï¼Œä½†ä»¥åä¸èƒ½å†é€‰æ‹©å®ƒã€‚`)) return;
+    if (!window.confirm(`¹éµµ¡°${category.name}¡±£¿ÀúÊ·Á÷Ë®»á±£Áô¸Ã·ÖÀà£¬µ«ÒÔºó²»ÄÜÔÙÑ¡ÔñËü¡£`)) return;
     try { setSaving(true); await archiveCategory(category.id); }
-    catch (error) { setMessage(error instanceof Error ? error.message : "å½’æ¡£å¤±è´¥"); }
+    catch (error) { setMessage(error instanceof Error ? error.message : "¹éµµÊ§°Ü"); }
     finally { setSaving(false); }
   };
   const selectedIcon = categoryIcon(icon);
@@ -2014,21 +2065,21 @@ function CategoryAdminDialog({
       <section className="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-[28px] bg-[#f5f7f7] md:max-w-[600px] md:rounded-[28px]">
         <header className="flex items-center justify-between bg-white px-5 py-4">
           <button onClick={() => mode === "form" ? setMode("manage") : managedParentId ? setManagedParentId(null) : onClose()} className="grid size-9 place-items-center rounded-full bg-[#f2f5f5]"><ChevronLeft size={20} /></button>
-          <p className="text-lg font-bold">{mode === "form" ? (editing ? "ç¼–è¾‘åˆ†ç±»" : "æ–°å¢åˆ†ç±»") : managedParent ? `${managedParent.name}å°ç±»` : "åˆ†ç±»ç®¡ç†"}</p>
+          <p className="text-lg font-bold">{mode === "form" ? (editing ? "±à¼­·ÖÀà" : "ĞÂÔö·ÖÀà") : managedParent ? `${managedParent.name}Ğ¡Àà` : "·ÖÀà¹ÜÀí"}</p>
           <button onClick={onClose} className="grid size-9 place-items-center rounded-full bg-[#f2f5f5]"><X size={18} /></button>
         </header>
         {mode === "manage" ? (
           <div className="min-h-0 flex-1 overflow-y-auto p-5">
             <div className="mb-4 flex rounded-xl bg-white p-1">
-              {(["expense", "income"] as TransactionKind[]).map((item) => <button key={item} onClick={() => setKind(item)} className={`flex-1 rounded-lg py-2 text-sm font-bold ${kind === item ? item === "income" ? "bg-[#fff0eb] text-[#ff714b]" : "bg-[#e4f7f4] text-[#0c6f78]" : "text-[#7d8792]"}`}>{item === "expense" ? "æ”¯å‡º" : "æ”¶å…¥"}</button>)}
+              {(["expense", "income"] as TransactionKind[]).map((item) => <button key={item} onClick={() => setKind(item)} className={`flex-1 rounded-lg py-2 text-sm font-bold ${kind === item ? item === "income" ? "bg-[#fff0eb] text-[#ff714b]" : "bg-[#e4f7f4] text-[#0c6f78]" : "text-[#7d8792]"}`}>{item === "expense" ? "Ö§³ö" : "ÊÕÈë"}</button>)}
             </div>
-            <button onClick={() => beginNew(kind, kind === "expense" ? managedParentId : null)} className="mb-3 w-full rounded-xl border border-dashed border-[#ffb09e] bg-white py-3 text-sm font-bold text-[#ff714b]">+ æ–°å¢{kind === "income" ? "æ”¶å…¥åˆ†ç±»" : managedParentId ? "å°ç±»" : "æ”¯å‡ºå¤§ç±»"}</button>
+            <button onClick={() => beginNew(kind, kind === "expense" ? managedParentId : null)} className="mb-3 w-full rounded-xl border border-dashed border-[#ffb09e] bg-white py-3 text-sm font-bold text-[#ff714b]">+ ĞÂÔö{kind === "income" ? "ÊÕÈë·ÖÀà" : managedParentId ? "Ğ¡Àà" : "Ö§³ö´óÀà"}</button>
             <div className="overflow-hidden rounded-2xl bg-white">
               {displayed.map((category) => {
                 const Icon = categoryIcon(category.icon);
                 const childCount = kind === "expense" ? categories.filter((item) => item.parentId === category.id).length : 0;
                 const isRoot = kind === "expense" && !managedParentId;
-                return <div key={category.id} className="flex items-center gap-3 border-b border-[#eef1f1] px-4 py-3 last:border-0"><span className={`grid size-9 place-items-center rounded-xl ${kind === "income" ? "bg-[#fff0eb] text-[#ff714b]" : "bg-[#e4f7f4] text-[#28b9aa]"}`}><Icon size={18} /></span><button onClick={() => isRoot ? setManagedParentId(category.id) : beginEdit(category)} className="min-w-0 flex-1 text-left"><p className="font-medium">{category.name}</p><p className="text-xs text-[#8b94a3]">{childCount ? `${childCount} ä¸ªå°ç±»` : kind === "income" ? "æ”¶å…¥åˆ†ç±»" : "æ”¯å‡ºå°ç±»"}</p></button>{isRoot && <button onClick={() => beginEdit(category)} className="text-xs font-bold text-[#0c6f78]">ç¼–è¾‘</button>}<button disabled={saving} onClick={() => archive(category)} className="text-xs text-[#a06d64]">å½’æ¡£</button>{isRoot && <ChevronRight size={16} className="text-[#a5adb6]" />}</div>;
+                return <div key={category.id} className="flex items-center gap-3 border-b border-[#eef1f1] px-4 py-3 last:border-0"><span className={`grid size-9 place-items-center rounded-xl ${kind === "income" ? "bg-[#fff0eb] text-[#ff714b]" : "bg-[#e4f7f4] text-[#28b9aa]"}`}><Icon size={18} /></span><button onClick={() => isRoot ? setManagedParentId(category.id) : beginEdit(category)} className="min-w-0 flex-1 text-left"><p className="font-medium">{category.name}</p><p className="text-xs text-[#8b94a3]">{childCount ? `${childCount} ¸öĞ¡Àà` : kind === "income" ? "ÊÕÈë·ÖÀà" : "Ö§³öĞ¡Àà"}</p></button>{isRoot && <button onClick={() => beginEdit(category)} className="text-xs font-bold text-[#0c6f78]">±à¼­</button>}<button disabled={saving} onClick={() => archive(category)} className="text-xs text-[#a06d64]">¹éµµ</button>{isRoot && <ChevronRight size={16} className="text-[#a5adb6]" />}</div>;
               })}
             </div>
             {message && <p className="mt-3 text-center text-sm text-[#c54c2c]">{message}</p>}
@@ -2036,13 +2087,13 @@ function CategoryAdminDialog({
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto p-5">
             <div className="rounded-2xl bg-white p-4">
-              {!editing && <div className="mb-4 flex rounded-xl bg-[#f3f5f5] p-1">{(["expense", "income"] as TransactionKind[]).map((item) => <button key={item} onClick={() => { setKind(item); setParentId(null); }} className={`flex-1 rounded-lg py-2 text-sm font-bold ${kind === item ? item === "income" ? "bg-white text-[#ff714b] shadow-sm" : "bg-white text-[#0c6f78] shadow-sm" : "text-[#7d8792]"}`}>{item === "expense" ? "æ”¯å‡º" : "æ”¶å…¥"}</button>)}</div>}
-              <label className="block text-sm text-[#7d8792]">åç§°<input value={name} onChange={(event) => setName(event.target.value)} maxLength={30} className="mt-2 w-full rounded-xl bg-[#f5f7f7] px-3 py-3 text-base text-[#20252b] outline-none" placeholder="è¯·è¾“å…¥åˆ†ç±»åç§°" /></label>
-              {kind === "expense" && <label className="mt-4 block text-sm text-[#7d8792]">æ‰€å±å¤§ç±»<select value={parentId ?? ""} onChange={(event) => setParentId(event.target.value || null)} className="mt-2 w-full rounded-xl bg-[#f5f7f7] px-3 py-3 text-base text-[#20252b] outline-none"><option value="">æ— ï¼ˆåˆ›å»ºæ”¯å‡ºå¤§ç±»ï¼‰</option>{roots.filter((root) => !editing || root.id !== editing.id).map((root) => <option key={root.id} value={root.id}>{root.name}</option>)}</select></label>}
+              {!editing && <div className="mb-4 flex rounded-xl bg-[#f3f5f5] p-1">{(["expense", "income"] as TransactionKind[]).map((item) => <button key={item} onClick={() => { setKind(item); setParentId(null); }} className={`flex-1 rounded-lg py-2 text-sm font-bold ${kind === item ? item === "income" ? "bg-white text-[#ff714b] shadow-sm" : "bg-white text-[#0c6f78] shadow-sm" : "text-[#7d8792]"}`}>{item === "expense" ? "Ö§³ö" : "ÊÕÈë"}</button>)}</div>}
+              <label className="block text-sm text-[#7d8792]">Ãû³Æ<input value={name} onChange={(event) => setName(event.target.value)} maxLength={30} className="mt-2 w-full rounded-xl bg-[#f5f7f7] px-3 py-3 text-base text-[#20252b] outline-none" placeholder="ÇëÊäÈë·ÖÀàÃû³Æ" /></label>
+              {kind === "expense" && <label className="mt-4 block text-sm text-[#7d8792]">ËùÊô´óÀà<select value={parentId ?? ""} onChange={(event) => setParentId(event.target.value || null)} className="mt-2 w-full rounded-xl bg-[#f5f7f7] px-3 py-3 text-base text-[#20252b] outline-none"><option value="">ÎŞ£¨´´½¨Ö§³ö´óÀà£©</option>{roots.filter((root) => !editing || root.id !== editing.id).map((root) => <option key={root.id} value={root.id}>{root.name}</option>)}</select></label>}
               <div className="mt-5">
                 <div className="flex items-center justify-between text-sm text-[#7d8792]">
-                  <span>é€‰æ‹©å›¾æ ‡</span>
-                  <span className="flex items-center gap-2 text-xs font-medium text-[#53606b]"><span className={`grid size-7 place-items-center rounded-lg ${iconSurface}`}><SelectedIcon size={15} /></span>{iconChoices.find(([value]) => value === icon)?.[1] ?? "è‡ªå®šä¹‰"}</span>
+                  <span>Ñ¡ÔñÍ¼±ê</span>
+                  <span className="flex items-center gap-2 text-xs font-medium text-[#53606b]"><span className={`grid size-7 place-items-center rounded-lg ${iconSurface}`}><SelectedIcon size={15} /></span>{iconChoices.find(([value]) => value === icon)?.[1] ?? "×Ô¶¨Òå"}</span>
                 </div>
                 <div className="mt-2 grid grid-cols-7 gap-2 rounded-2xl bg-[#f5f7f7] p-3 sm:grid-cols-8">
                   {iconChoices.map(([value, label]) => {
@@ -2054,7 +2105,7 @@ function CategoryAdminDialog({
               </div>
             </div>
             {message && <p className="mt-3 text-center text-sm text-[#c54c2c]">{message}</p>}
-            <button disabled={saving} onClick={submit} className="mt-5 w-full rounded-2xl bg-[#ff714b] py-3.5 font-bold text-white disabled:opacity-60">{saving ? "ä¿å­˜ä¸­â€¦" : "ä¿å­˜"}</button>
+            <button disabled={saving} onClick={submit} className="mt-5 w-full rounded-2xl bg-[#ff714b] py-3.5 font-bold text-white disabled:opacity-60">{saving ? "±£´æÖĞ¡­" : "±£´æ"}</button>
           </div>
         )}
       </section>
@@ -2086,7 +2137,7 @@ function ImportDialog({
       setError(
         cause instanceof Error
           ? cause.message
-          : "æ–‡ä»¶è§£æå¤±è´¥ï¼Œè¯·æ¢ä¸€ä¸ªè´¦å•æ–‡ä»¶åé‡è¯•ã€‚",
+          : "ÎÄ¼ş½âÎöÊ§°Ü£¬Çë»»Ò»¸öÕËµ¥ÎÄ¼şºóÖØÊÔ¡£",
       );
     } finally {
       setParsing(false);
@@ -2095,18 +2146,18 @@ function ImportDialog({
   const previewRows = parsed?.rows.slice(0, 4) ?? [];
   const sourceName =
     parsed?.source === "alipay"
-      ? "æ”¯ä»˜å®"
+      ? "Ö§¸¶±¦"
       : parsed?.source === "wechat"
-        ? "å¾®ä¿¡æ”¯ä»˜"
-        : "é€šç”¨è´¦å•";
+        ? "Î¢ĞÅÖ§¸¶"
+        : "Í¨ÓÃÕËµ¥";
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-[#102124]/35 p-4 backdrop-blur-sm">
       <section className="w-full max-w-[620px] overflow-hidden rounded-[28px] bg-white shadow-2xl">
         <header className="flex items-center justify-between border-b border-[#ebeeee] px-6 py-5">
           <div>
-            <p className="text-lg font-bold">å¯¼å…¥è´¦å•</p>
+            <p className="text-lg font-bold">µ¼ÈëÕËµ¥</p>
             <p className="mt-1 text-sm text-[#8b94a3]">
-              åŸå§‹æ–‡ä»¶åªåœ¨ä½ çš„æµè§ˆå™¨ä¸­è§£æ
+              Ô­Ê¼ÎÄ¼şÖ»ÔÚÄãµÄä¯ÀÀÆ÷ÖĞ½âÎö
             </p>
           </div>
           <button
@@ -2133,9 +2184,9 @@ function ImportDialog({
                 <span className="grid size-11 place-items-center rounded-2xl bg-[#e4f7f4] text-[#0c6f78]">
                   <Sparkles size={22} />
                 </span>
-                <p className="mt-4 font-bold">å¯¼å…¥å¾®ä¿¡æ”¯ä»˜è´¦å•</p>
+                <p className="mt-4 font-bold">µ¼ÈëÎ¢ĞÅÖ§¸¶ÕËµ¥</p>
                 <p className="mt-1 text-sm leading-5 text-[#8b94a3]">
-                  æ”¯æŒ CSVã€Excel ä¸å‹ç¼©æ–‡ä»¶
+                  Ö§³Ö CSV¡¢Excel ÓëÑ¹ËõÎÄ¼ş
                 </p>
               </button>
               <button
@@ -2145,9 +2196,9 @@ function ImportDialog({
                 <span className="grid size-11 place-items-center rounded-2xl bg-[#edf0ff] text-[#5579de]">
                   <Landmark size={22} />
                 </span>
-                <p className="mt-4 font-bold">å¯¼å…¥æ”¯ä»˜å®è´¦å•</p>
+                <p className="mt-4 font-bold">µ¼ÈëÖ§¸¶±¦ÕËµ¥</p>
                 <p className="mt-1 text-sm leading-5 text-[#8b94a3]">
-                  æ”¯æŒ CSVã€Excel ä¸å‹ç¼©æ–‡ä»¶
+                  Ö§³Ö CSV¡¢Excel ÓëÑ¹ËõÎÄ¼ş
                 </p>
               </button>
             </div>
@@ -2157,7 +2208,7 @@ function ImportDialog({
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[#a7c6c4] bg-[#f8fcfc] px-4 py-5 text-sm font-medium text-[#0c6f78] disabled:opacity-60"
             >
               <FileUp size={19} />
-              {parsing ? "æ­£åœ¨æœ¬åœ°è§£æâ€¦" : "é€‰æ‹©æœ¬åœ°è´¦å•æ–‡ä»¶"}
+              {parsing ? "ÕıÔÚ±¾µØ½âÎö¡­" : "Ñ¡Ôñ±¾µØÕËµ¥ÎÄ¼ş"}
             </button>
             {error && (
               <p className="mt-3 rounded-xl bg-[#fff0ed] px-3 py-2 text-sm text-[#c54c2c]">
@@ -2165,7 +2216,7 @@ function ImportDialog({
               </p>
             )}
             <p className="mt-3 text-center text-xs leading-5 text-[#98a1aa]">
-              ä¸éœ€è¦å¾®ä¿¡æˆ–æ”¯ä»˜å®å¯†ç ï¼Œä¹Ÿä¸ä¼šä¸Šä¼ ä½ çš„åŸå§‹è´¦å•æ–‡ä»¶ã€‚
+              ²»ĞèÒªÎ¢ĞÅ»òÖ§¸¶±¦ÃÜÂë£¬Ò²²»»áÉÏ´«ÄãµÄÔ­Ê¼ÕËµ¥ÎÄ¼ş¡£
             </p>
           </div>
         )}
@@ -2173,17 +2224,17 @@ function ImportDialog({
           <div className="p-6">
             <div className="rounded-2xl bg-[#eaf8f6] p-4">
               <p className="font-bold text-[#0c6f78]">
-                å·²è¯†åˆ«ï¼š{sourceName}è´¦å•
+                ÒÑÊ¶±ğ£º{sourceName}ÕËµ¥
               </p>
               <p className="mt-1 text-sm text-[#47716f]">
-                {parsed.filename} Â· å·²è§£æ {parsed.rows.length} æ¡æœ‰æ•ˆè®°å½•
+                {parsed.filename} ¡¤ ÒÑ½âÎö {parsed.rows.length} ÌõÓĞĞ§¼ÇÂ¼
               </p>
               <div className="mt-3 flex gap-4 text-sm">
                 <span>
-                  <b>{parsed.rows.length}</b> å¾…å¯¼å…¥
+                  <b>{parsed.rows.length}</b> ´ıµ¼Èë
                 </span>
                 <span>
-                  <b>{parsed.skipped}</b> è·³è¿‡ç©ºè¡Œ/å¼‚å¸¸
+                  <b>{parsed.skipped}</b> Ìø¹ı¿ÕĞĞ/Òì³£
                 </span>
                 <span>
                   <b>
@@ -2192,7 +2243,7 @@ function ImportDialog({
                         .length
                     }
                   </b>{" "}
-                  å¾…ç¡®è®¤
+                  ´ıÈ·ÈÏ
                 </span>
               </div>
             </div>
@@ -2210,11 +2261,11 @@ function ImportDialog({
                       {row.merchantName}
                     </p>
                     <p className="text-xs text-[#8b94a3]">
-                      {row.occurredAt || "æ—¥æœŸå¾…ç¡®è®¤"} Â· {row.category}
+                      {row.occurredAt || "ÈÕÆÚ´ıÈ·ÈÏ"} ¡¤ {row.category}
                     </p>
                   </div>
                   <b className="money text-sm">
-                    {row.direction === "income" ? "+" : "-"}Â¥
+                    {row.direction === "income" ? "+" : "-"}£¤
                     {yuan(row.amountCents / 100)}
                   </b>
                 </div>
@@ -2225,13 +2276,13 @@ function ImportDialog({
                 onClick={() => setStep("choose")}
                 className="flex-1 rounded-xl bg-[#f0f4f4] py-3 text-sm font-semibold"
               >
-                è¿”å›
+                ·µ»Ø
               </button>
               <button
                 onClick={() => setStep("done")}
                 className="flex-[1.6] rounded-xl bg-[#0c6f78] py-3 text-sm font-bold text-white"
               >
-                ç¡®è®¤å¯¼å…¥ {parsed.rows.length} ç¬”
+                È·ÈÏµ¼Èë {parsed.rows.length} ±Ê
               </button>
             </div>
           </div>
@@ -2241,17 +2292,17 @@ function ImportDialog({
             <span className="mx-auto grid size-16 place-items-center rounded-full bg-[#e4f7f4] text-[#0c6f78]">
               <TrendingUp size={30} />
             </span>
-            <p className="mt-5 text-xl font-bold">è´¦å•å·²æ•´ç†å®Œæˆ</p>
+            <p className="mt-5 text-xl font-bold">ÕËµ¥ÒÑÕûÀíÍê³É</p>
             <p className="mt-2 text-sm leading-6 text-[#7d8792]">
-              å·²å®Œæˆæœ¬åœ°è§£æä¸å¯¼å…¥ç¡®è®¤ã€‚
+              ÒÑÍê³É±¾µØ½âÎöÓëµ¼ÈëÈ·ÈÏ¡£
               <br />
-              é…ç½® Supabase åï¼Œç¡®è®¤ç»“æœå°†å†™å…¥ä½ çš„ç§æœ‰äº‘ç«¯è´¦æœ¬ã€‚
+              ÅäÖÃ Supabase ºó£¬È·ÈÏ½á¹û½«Ğ´ÈëÄãµÄË½ÓĞÔÆ¶ËÕË±¾¡£
             </p>
             <button
               onClick={onClose}
               className="mt-6 rounded-xl bg-[#0c6f78] px-8 py-3 text-sm font-bold text-white"
             >
-              æŸ¥çœ‹æœ¬æœˆæŠ¥è¡¨
+              ²é¿´±¾ÔÂ±¨±í
             </button>
           </div>
         )}
