@@ -4,6 +4,7 @@ import {
   ArrowDownLeft,
   ArrowLeftRight,
   ArrowUpRight,
+  Bike,
   BadgePlus,
   BarChart3,
   BellRing,
@@ -18,13 +19,16 @@ import {
   Ellipsis,
   FileUp,
   Home,
+  Heart,
   Landmark,
   LayoutGrid,
   ListFilter,
   MoreHorizontal,
+  Plane,
   Plus,
   ReceiptText,
   Settings2,
+  Shirt,
   ShoppingBag,
   Sparkles,
   Target,
@@ -41,12 +45,13 @@ import {
 } from "@/features/importers/parse-statement";
 import {
   useLedger,
+  type LedgerCategory,
   type LedgerTransaction,
 } from "@/features/ledger/use-ledger";
 import { useSession } from "@/lib/auth/client";
 
 type View = "home" | "reports" | "accounts" | "plans" | "transactions";
-type TransactionKind = "expense" | "income" | "transfer";
+type TransactionKind = "expense" | "income";
 
 const navItems: { id: View; label: string; icon: typeof Home }[] = [
   { id: "accounts", label: "账户", icon: WalletCards },
@@ -55,26 +60,24 @@ const navItems: { id: View; label: string; icon: typeof Home }[] = [
   { id: "reports", label: "报表", icon: BarChart3 },
 ];
 
-const expenseCategories = [
-  ["早餐", Coffee],
-  ["午餐", Utensils],
-  ["晚餐", Utensils],
-  ["饮料水果", Sparkles],
-  ["买菜原料", ShoppingBag],
-  ["家居百货", Home],
-  ["打车", ArrowLeftRight],
-  ["零食", Coffee],
-  ["医疗药品", CircleDollarSign],
-  ["电子数码", Zap],
-  ["服饰鞋包", ShoppingBag],
-  ["水电燃气", Landmark],
-];
-const incomeCategories = [
-  ["工资薪水", WalletCards],
-  ["报销", ReceiptText],
-  ["红包", Sparkles],
-  ["其他收入", BadgePlus],
-];
+function categoryIcon(icon?: string | null) {
+  switch (icon) {
+    case "coffee": return Coffee;
+    case "car": return ArrowLeftRight;
+    case "bike": return Bike;
+    case "plane": return Plane;
+    case "shopping-bag": return ShoppingBag;
+    case "shirt": return Shirt;
+    case "home": return Home;
+    case "heart": return Heart;
+    case "wallet": return WalletCards;
+    case "badge-plus": return BadgePlus;
+    case "zap": return Zap;
+    case "landmark": return Landmark;
+    case "trending-up": return TrendingUp;
+    default: return Utensils;
+  }
+}
 
 function yuan(value: number) {
   return new Intl.NumberFormat("zh-CN", {
@@ -223,7 +226,8 @@ export default function HomePage() {
     "choose",
   );
   const [kind, setKind] = useState<TransactionKind>("expense");
-  const [selectedCategory, setSelectedCategory] = useState("午餐");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [amount, setAmount] = useState("0");
   const [note, setNote] = useState("");
   const [editingTransaction, setEditingTransaction] =
@@ -236,13 +240,47 @@ export default function HomePage() {
   const [mobileMenu, setMobileMenu] = useState(false);
   const ledger = useLedger(Boolean(session?.user));
 
-  const categories = kind === "income" ? incomeCategories : expenseCategories;
-  const kindLabel =
-    kind === "expense" ? "支出" : kind === "income" ? "收入" : "转账";
-  const selectedIcon = (categories.find(
-    ([name]) => name === selectedCategory,
-  )?.[1] || Utensils) as typeof Utensils;
-  const SelectedIcon = selectedIcon;
+  const selectableCategories = useMemo(
+    () =>
+      ledger.categories.filter(
+        (category) =>
+          category.kind === kind &&
+          (kind === "income" ? !category.parentId : Boolean(category.parentId)),
+      ),
+    [kind, ledger.categories],
+  );
+  const commonCategories = useMemo(() => {
+    const usage = new Map<string, { count: number; lastUsed: number }>();
+    ledger.transactions.forEach((transaction) => {
+      if (!transaction.categoryId) return;
+      const current = usage.get(transaction.categoryId) ?? { count: 0, lastUsed: 0 };
+      usage.set(transaction.categoryId, {
+        count: current.count + 1,
+        lastUsed: Math.max(current.lastUsed, new Date(transaction.occurredAt).getTime()),
+      });
+    });
+    return [...selectableCategories]
+      .sort((left, right) => {
+        const leftUsage = usage.get(left.id) ?? { count: 0, lastUsed: 0 };
+        const rightUsage = usage.get(right.id) ?? { count: 0, lastUsed: 0 };
+        return rightUsage.count - leftUsage.count || rightUsage.lastUsed - leftUsage.lastUsed || left.sortOrder - right.sortOrder;
+      })
+      .slice(0, 7);
+  }, [ledger.transactions, selectableCategories]);
+  const selectedCategory = ledger.categories.find((category) => category.id === selectedCategoryId);
+  const kindLabel = kind === "expense" ? "支出" : "收入";
+  const SelectedIcon = categoryIcon(selectedCategory?.icon);
+  const defaultCategoryId = (targetKind: TransactionKind) =>
+    ledger.categories.find(
+      (category) =>
+        category.kind === targetKind &&
+        (targetKind === "income" ? !category.parentId : Boolean(category.parentId)),
+    )?.id ?? "";
+
+  function switchKind(targetKind: TransactionKind) {
+    setKind(targetKind);
+    setSelectedCategoryId(defaultCategoryId(targetKind));
+  }
 
   const headline = useMemo(() => {
     if (view === "transactions") return "全部流水";
@@ -280,27 +318,22 @@ export default function HomePage() {
 
   function openNewTransaction() {
     setEditingTransaction(null);
-    setKind("expense");
-    setSelectedCategory("午餐");
+    switchKind("expense");
     setAmount("0");
     setNote("");
     setComposerOpen(true);
   }
 
   function openTransactionEditor(transaction: LedgerTransaction) {
-    const transactionKind: TransactionKind =
-      transaction.transactionType === "income"
-        ? "income"
-        : transaction.transactionType === "transfer"
-          ? "transfer"
-          : "expense";
+    if (transaction.transactionType === "transfer") {
+      setToast("转账编辑将在账户模块上线后支持。");
+      window.setTimeout(() => setToast(""), 3200);
+      return;
+    }
+    const transactionKind: TransactionKind = transaction.transactionType === "income" ? "income" : "expense";
     setEditingTransaction(transaction);
     setKind(transactionKind);
-    setSelectedCategory(
-      transaction.categoryName ||
-        transaction.merchantName ||
-        (transactionKind === "income" ? "工资薪水" : "午餐"),
-    );
+    setSelectedCategoryId(transaction.categoryId ?? defaultCategoryId(transactionKind));
     setAmount((transaction.amountCents / 100).toFixed(2));
     setNote(transaction.note || "");
     setComposerOpen(true);
@@ -313,6 +346,10 @@ export default function HomePage() {
       setToast("请输入大于 0 的金额");
       return;
     }
+    if (!selectedCategoryId) {
+      setToast("请选择分类");
+      return;
+    }
     try {
       setSaving(true);
       if (editingTransaction) {
@@ -320,14 +357,14 @@ export default function HomePage() {
           id: editingTransaction.id,
           transactionType: kind,
           amountCents,
-          categoryName: selectedCategory,
+          categoryId: selectedCategoryId,
           note,
         });
       } else {
         await ledger.addTransaction({
           transactionType: kind,
           amountCents,
-          categoryName: selectedCategory,
+          categoryId: selectedCategoryId,
           note,
         });
       }
@@ -517,10 +554,17 @@ export default function HomePage() {
       {composerOpen && (
         <Composer
           kind={kind}
-          setKind={setKind}
+          setKind={switchKind}
           selectedCategory={selectedCategory}
-          setSelectedCategory={setSelectedCategory}
-          categories={categories}
+          selectedCategoryId={selectedCategoryId}
+          setSelectedCategoryId={setSelectedCategoryId}
+          categories={commonCategories}
+          allCategories={ledger.categories}
+          pickerOpen={categoryPickerOpen}
+          setPickerOpen={setCategoryPickerOpen}
+          createCategory={ledger.createCategory}
+          updateCategory={ledger.updateCategory}
+          archiveCategory={ledger.archiveCategory}
           amount={amount}
           note={note}
           editing={Boolean(editingTransaction)}
@@ -1575,8 +1619,15 @@ function Composer({
   kind,
   setKind,
   selectedCategory,
-  setSelectedCategory,
+  selectedCategoryId,
+  setSelectedCategoryId,
   categories,
+  allCategories,
+  pickerOpen,
+  setPickerOpen,
+  createCategory,
+  updateCategory,
+  archiveCategory,
   amount,
   note,
   editing,
@@ -1590,9 +1641,16 @@ function Composer({
 }: {
   kind: TransactionKind;
   setKind: (kind: TransactionKind) => void;
-  selectedCategory: string;
-  setSelectedCategory: (category: string) => void;
-  categories: (string | typeof Coffee)[][];
+  selectedCategory?: LedgerCategory;
+  selectedCategoryId: string;
+  setSelectedCategoryId: (categoryId: string) => void;
+  categories: LedgerCategory[];
+  allCategories: LedgerCategory[];
+  pickerOpen: boolean;
+  setPickerOpen: (open: boolean) => void;
+  createCategory: (input: { name: string; kind: "expense" | "income"; parentId?: string | null; icon?: string | null; color?: string }) => Promise<LedgerCategory>;
+  updateCategory: (id: string, input: { name: string; kind: "expense" | "income"; parentId?: string | null; icon?: string | null; color?: string }) => Promise<LedgerCategory>;
+  archiveCategory: (id: string) => Promise<LedgerCategory>;
   amount: string;
   note: string;
   editing: boolean;
@@ -1604,10 +1662,11 @@ function Composer({
   onSave: () => void;
   SelectedIcon: typeof Utensils;
 }) {
+  const [activeParentId, setActiveParentId] = useState<string | null>(null);
+  const [adminMode, setAdminMode] = useState<"manage" | "new" | null>(null);
   const tabs: [TransactionKind, string, typeof ArrowDownLeft][] = [
     ["expense", "支出", ArrowUpRight],
     ["income", "收入", ArrowDownLeft],
-    ["transfer", "转账", ArrowLeftRight],
   ];
   const keypad = [
     "1",
@@ -1624,6 +1683,34 @@ function Composer({
     ".",
     "0",
   ];
+  const roots = allCategories.filter(
+    (category) => category.kind === "expense" && !category.parentId,
+  );
+  const pickerItems =
+    kind === "income"
+      ? allCategories.filter(
+          (category) => category.kind === "income" && !category.parentId,
+        )
+      : activeParentId
+        ? allCategories.filter(
+            (category) =>
+              category.kind === "expense" && category.parentId === activeParentId,
+          )
+        : roots;
+  const activeParent = roots.find((category) => category.id === activeParentId);
+  const selectCategory = (category: LedgerCategory) => {
+    setSelectedCategoryId(category.id);
+    setPickerOpen(false);
+    setActiveParentId(null);
+  };
+  const incomeMode = kind === "income";
+  const selectedCategoryStyle = incomeMode
+    ? "bg-[#ff714b] text-white shadow-[0_8px_16px_rgba(255,113,75,.28)]"
+    : "bg-[#28c5b4] text-white shadow-[0_8px_16px_rgba(40,197,180,.28)]";
+  const categoryIconStyle = incomeMode
+    ? "bg-[#fff0eb] text-[#ff714b]"
+    : "bg-[#e4f7f4] text-[#28b9aa]";
+  const selectedTextStyle = incomeMode ? "text-[#ff714b]" : "text-[#0c6f78]";
 
   return (
     <div className="fixed inset-0 z-40 flex items-end bg-[#0f2225]/35 p-0 backdrop-blur-[2px] md:items-center md:justify-center md:p-6">
@@ -1650,7 +1737,6 @@ function Composer({
               <button
                 onClick={() => {
                   setKind(id);
-                  setSelectedCategory(id === "income" ? "工资薪水" : "午餐");
                 }}
                 disabled={saving}
                 className={`flex flex-col items-center gap-1 text-sm ${kind === id ? "font-bold text-white" : "text-white/60"}`}
@@ -1667,10 +1753,17 @@ function Composer({
           </div>
         </header>
         <div className="relative -mt-3 mx-4 flex items-center gap-4 rounded-2xl bg-white px-5 py-4 shadow-lg md:mx-7">
-          <span className="grid size-11 place-items-center rounded-2xl bg-[#e4f7f4] text-[#28b9aa]">
+          <span className={`grid size-11 place-items-center rounded-2xl ${categoryIconStyle}`}>
             <SelectedIcon size={23} />
           </span>
-          <b className="text-lg">{selectedCategory}</b>
+          <button
+            onClick={() => setPickerOpen(true)}
+            disabled={saving}
+            className="flex min-w-0 items-center gap-1 text-left text-lg font-bold"
+          >
+            <span className="truncate">{selectedCategory?.name ?? "选择分类"}</span>
+            <ChevronDown size={16} />
+          </button>
           <input
             value={amount === "0" ? "0" : amount}
             onChange={(event) => onAmountChange(event.target.value)}
@@ -1683,27 +1776,37 @@ function Composer({
         </div>
         <div className="flex-1 overflow-y-auto px-5 pb-4 pt-7 md:px-8">
           <div className="grid grid-cols-4 gap-x-2 gap-y-6 sm:grid-cols-6">
-            {categories.map(([name, Icon]) => {
-              const CategoryIcon = Icon as typeof Coffee;
-              const selected = name === selectedCategory;
+            {categories.map((category) => {
+              const CategoryIcon = categoryIcon(category.icon);
+              const selected = category.id === selectedCategoryId;
               return (
                 <button
-                  onClick={() => setSelectedCategory(name as string)}
+                  onClick={() => setSelectedCategoryId(category.id)}
                   disabled={saving}
                   className="grid place-items-center gap-2 text-center text-sm text-[#4e5863]"
-                  key={name as string}
+                  key={category.id}
                 >
                   <span
-                    className={`grid size-11 place-items-center rounded-2xl ${selected ? "bg-[#28c5b4] text-white shadow-[0_8px_16px_rgba(40,197,180,.28)]" : "bg-[#e9edef] text-[#9aa4b1]"}`}
+                    className={`grid size-11 place-items-center rounded-2xl ${selected ? selectedCategoryStyle : "bg-[#e9edef] text-[#9aa4b1]"}`}
                   >
                     <CategoryIcon size={21} />
                   </span>
                   <span className={selected ? "font-bold text-[#20252b]" : ""}>
-                    {name as string}
+                    {category.name}
                   </span>
                 </button>
               );
             })}
+            <button
+              onClick={() => setPickerOpen(true)}
+              disabled={saving}
+              className="grid place-items-center gap-2 text-center text-sm text-[#4e5863]"
+            >
+              <span className="grid size-11 place-items-center rounded-2xl bg-[#e9edef] text-[#778391]">
+                <MoreHorizontal size={22} />
+              </span>
+              <span>全部</span>
+            </button>
           </div>
           <input
             value={note}
@@ -1753,6 +1856,207 @@ function Composer({
             {saving ? "保存中…" : editing ? "保存修改" : "保存"}
           </button>
         </div>
+      </section>
+      {pickerOpen && (
+        <div className="absolute inset-0 z-10 flex items-end bg-black/35 md:items-center md:justify-center">
+          <section className="max-h-[82dvh] w-full overflow-hidden rounded-t-[28px] bg-white shadow-2xl md:max-w-[560px] md:rounded-[28px]">
+            <header className="flex items-center justify-between border-b border-[#edf0f0] px-5 py-4">
+              <button
+                onClick={() => {
+                  if (activeParentId) setActiveParentId(null);
+                  else setPickerOpen(false);
+                }}
+                className="grid size-9 place-items-center rounded-full bg-[#f2f5f5]"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <div className="text-center">
+                <p className="font-bold">选择分类</p>
+                {activeParent && <p className="text-xs text-[#8b94a3]">{activeParent.name}</p>}
+              </div>
+              <button onClick={() => setPickerOpen(false)} className="grid size-9 place-items-center rounded-full bg-[#f2f5f5]">
+                <X size={18} />
+              </button>
+            </header>
+            <div className="max-h-[54dvh] overflow-y-auto px-5 py-3">
+              {pickerItems.map((category) => {
+                const Icon = categoryIcon(category.icon);
+                const isParent = kind === "expense" && !activeParentId;
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() => isParent ? setActiveParentId(category.id) : selectCategory(category)}
+                    className="flex w-full items-center gap-3 border-b border-[#f0f2f2] py-4 text-left last:border-0"
+                  >
+                    <span className={`grid size-10 place-items-center rounded-2xl ${categoryIconStyle}`}>
+                      <Icon size={20} />
+                    </span>
+                    <span className="flex-1 font-medium">{category.name}</span>
+                    {isParent ? <ChevronRight size={18} className="text-[#a5adb6]" /> : category.id === selectedCategoryId ? <span className={`text-sm font-bold ${selectedTextStyle}`}>已选</span> : null}
+                  </button>
+                );
+              })}
+              {!pickerItems.length && (
+                <p className="py-10 text-center text-sm text-[#8b94a3]">当前大类还没有小类。</p>
+              )}
+            </div>
+            <footer className="flex border-t border-[#edf0f0] text-[#ff714b]">
+              <button onClick={() => setAdminMode("new")} className="flex-1 py-4 text-sm font-bold">+ 新增分类</button>
+              <button onClick={() => setAdminMode("manage")} className="flex-1 border-l border-[#edf0f0] py-4 text-sm font-bold">管理</button>
+            </footer>
+          </section>
+        </div>
+      )}
+      {adminMode && (
+        <CategoryAdminDialog
+          startMode={adminMode}
+          initialKind={kind}
+          initialParentId={kind === "expense" ? activeParentId : null}
+          categories={allCategories}
+          createCategory={createCategory}
+          updateCategory={updateCategory}
+          archiveCategory={archiveCategory}
+          onClose={() => setAdminMode(null)}
+          onCreated={(category) => {
+            setAdminMode(null);
+            if (category.kind === "income" || category.parentId) {
+              setSelectedCategoryId(category.id);
+              setPickerOpen(false);
+              setActiveParentId(null);
+            } else {
+              setPickerOpen(true);
+              setActiveParentId(category.id);
+            }
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function CategoryAdminDialog({
+  startMode,
+  initialKind,
+  initialParentId,
+  categories,
+  createCategory,
+  updateCategory,
+  archiveCategory,
+  onClose,
+  onCreated,
+}: {
+  startMode: "manage" | "new";
+  initialKind: TransactionKind;
+  initialParentId: string | null;
+  categories: LedgerCategory[];
+  createCategory: (input: { name: string; kind: "expense" | "income"; parentId?: string | null; icon?: string | null; color?: string }) => Promise<LedgerCategory>;
+  updateCategory: (id: string, input: { name: string; kind: "expense" | "income"; parentId?: string | null; icon?: string | null; color?: string }) => Promise<LedgerCategory>;
+  archiveCategory: (id: string) => Promise<LedgerCategory>;
+  onClose: () => void;
+  onCreated: (category: LedgerCategory) => void;
+}) {
+  const iconChoices = [
+    ["shopping-bag", "购物"],
+    ["utensils", "餐饮"],
+    ["car", "交通"],
+    ["home", "居家"],
+    ["heart", "人情"],
+    ["wallet", "收入"],
+    ["badge-plus", "新增"],
+    ["trending-up", "投资"],
+    ["sparkles", "娱乐"],
+    ["zap", "数码"],
+    ["coffee", "咖啡"],
+    ["plane", "出行"],
+    ["bike", "骑行"],
+    ["shirt", "服饰"],
+  ] as const;
+  const [mode, setMode] = useState<"manage" | "form">(startMode === "new" ? "form" : "manage");
+  const [kind, setKind] = useState<TransactionKind>(initialKind);
+  const [parentId, setParentId] = useState<string | null>(initialParentId);
+  const [name, setName] = useState("");
+  const [icon, setIcon] = useState("shopping-bag");
+  const [editing, setEditing] = useState<LedgerCategory | null>(null);
+  const [managedParentId, setManagedParentId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const roots = categories.filter((category) => category.kind === "expense" && !category.parentId);
+  const managedParent = roots.find((category) => category.id === managedParentId);
+  const displayed = categories.filter((category) => category.kind === kind && (kind === "income" || (managedParentId ? category.parentId === managedParentId : !category.parentId)));
+  const beginNew = (targetKind = kind, targetParentId: string | null = null) => {
+    setEditing(null); setKind(targetKind); setParentId(targetParentId); setName(""); setIcon(targetKind === "income" ? "badge-plus" : "shopping-bag"); setMessage(""); setMode("form");
+  };
+  const beginEdit = (category: LedgerCategory) => {
+    setEditing(category); setKind(category.kind); setParentId(category.parentId); setName(category.name); setIcon(category.icon ?? "shopping-bag"); setMessage(""); setMode("form");
+  };
+  const submit = async () => {
+    try {
+      setSaving(true); setMessage("");
+      const input = { name, kind, parentId: kind === "income" ? null : parentId, icon, color: kind === "income" ? "#ff714b" : "#28c5b4" };
+      const category = editing ? await updateCategory(editing.id, input) : await createCategory(input);
+      if (!editing) onCreated(category);
+      else { setMessage("已保存"); setMode("manage"); }
+    } catch (error) { setMessage(error instanceof Error ? error.message : "保存失败"); }
+    finally { setSaving(false); }
+  };
+  const archive = async (category: LedgerCategory) => {
+    if (!window.confirm(`归档“${category.name}”？历史流水会保留该分类，但以后不能再选择它。`)) return;
+    try { setSaving(true); await archiveCategory(category.id); }
+    catch (error) { setMessage(error instanceof Error ? error.message : "归档失败"); }
+    finally { setSaving(false); }
+  };
+  const selectedIcon = categoryIcon(icon);
+  const SelectedIcon = selectedIcon;
+  const iconColor = kind === "income" ? "#ff714b" : "#28c5b4";
+  const iconSurface = kind === "income" ? "bg-[#fff0eb] text-[#ff714b]" : "bg-[#e4f7f4] text-[#28b9aa]";
+  return (
+    <div className="absolute inset-0 z-20 flex items-end bg-black/40 md:items-center md:justify-center">
+      <section className="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-[28px] bg-[#f5f7f7] md:max-w-[600px] md:rounded-[28px]">
+        <header className="flex items-center justify-between bg-white px-5 py-4">
+          <button onClick={() => mode === "form" ? setMode("manage") : managedParentId ? setManagedParentId(null) : onClose()} className="grid size-9 place-items-center rounded-full bg-[#f2f5f5]"><ChevronLeft size={20} /></button>
+          <p className="text-lg font-bold">{mode === "form" ? (editing ? "编辑分类" : "新增分类") : managedParent ? `${managedParent.name}小类` : "分类管理"}</p>
+          <button onClick={onClose} className="grid size-9 place-items-center rounded-full bg-[#f2f5f5]"><X size={18} /></button>
+        </header>
+        {mode === "manage" ? (
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            <div className="mb-4 flex rounded-xl bg-white p-1">
+              {(["expense", "income"] as TransactionKind[]).map((item) => <button key={item} onClick={() => setKind(item)} className={`flex-1 rounded-lg py-2 text-sm font-bold ${kind === item ? item === "income" ? "bg-[#fff0eb] text-[#ff714b]" : "bg-[#e4f7f4] text-[#0c6f78]" : "text-[#7d8792]"}`}>{item === "expense" ? "支出" : "收入"}</button>)}
+            </div>
+            <button onClick={() => beginNew(kind, kind === "expense" ? managedParentId : null)} className="mb-3 w-full rounded-xl border border-dashed border-[#ffb09e] bg-white py-3 text-sm font-bold text-[#ff714b]">+ 新增{kind === "income" ? "收入分类" : managedParentId ? "小类" : "支出大类"}</button>
+            <div className="overflow-hidden rounded-2xl bg-white">
+              {displayed.map((category) => {
+                const Icon = categoryIcon(category.icon);
+                const childCount = kind === "expense" ? categories.filter((item) => item.parentId === category.id).length : 0;
+                const isRoot = kind === "expense" && !managedParentId;
+                return <div key={category.id} className="flex items-center gap-3 border-b border-[#eef1f1] px-4 py-3 last:border-0"><span className={`grid size-9 place-items-center rounded-xl ${kind === "income" ? "bg-[#fff0eb] text-[#ff714b]" : "bg-[#e4f7f4] text-[#28b9aa]"}`}><Icon size={18} /></span><button onClick={() => isRoot ? setManagedParentId(category.id) : beginEdit(category)} className="min-w-0 flex-1 text-left"><p className="font-medium">{category.name}</p><p className="text-xs text-[#8b94a3]">{childCount ? `${childCount} 个小类` : kind === "income" ? "收入分类" : "支出小类"}</p></button>{isRoot && <button onClick={() => beginEdit(category)} className="text-xs font-bold text-[#0c6f78]">编辑</button>}<button disabled={saving} onClick={() => archive(category)} className="text-xs text-[#a06d64]">归档</button>{isRoot && <ChevronRight size={16} className="text-[#a5adb6]" />}</div>;
+              })}
+            </div>
+            {message && <p className="mt-3 text-center text-sm text-[#c54c2c]">{message}</p>}
+          </div>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            <div className="rounded-2xl bg-white p-4">
+              {!editing && <div className="mb-4 flex rounded-xl bg-[#f3f5f5] p-1">{(["expense", "income"] as TransactionKind[]).map((item) => <button key={item} onClick={() => { setKind(item); setParentId(null); }} className={`flex-1 rounded-lg py-2 text-sm font-bold ${kind === item ? item === "income" ? "bg-white text-[#ff714b] shadow-sm" : "bg-white text-[#0c6f78] shadow-sm" : "text-[#7d8792]"}`}>{item === "expense" ? "支出" : "收入"}</button>)}</div>}
+              <label className="block text-sm text-[#7d8792]">名称<input value={name} onChange={(event) => setName(event.target.value)} maxLength={30} className="mt-2 w-full rounded-xl bg-[#f5f7f7] px-3 py-3 text-base text-[#20252b] outline-none" placeholder="请输入分类名称" /></label>
+              {kind === "expense" && <label className="mt-4 block text-sm text-[#7d8792]">所属大类<select value={parentId ?? ""} onChange={(event) => setParentId(event.target.value || null)} className="mt-2 w-full rounded-xl bg-[#f5f7f7] px-3 py-3 text-base text-[#20252b] outline-none"><option value="">无（创建支出大类）</option>{roots.filter((root) => !editing || root.id !== editing.id).map((root) => <option key={root.id} value={root.id}>{root.name}</option>)}</select></label>}
+              <div className="mt-5">
+                <div className="flex items-center justify-between text-sm text-[#7d8792]">
+                  <span>选择图标</span>
+                  <span className="flex items-center gap-2 text-xs font-medium text-[#53606b]"><span className={`grid size-7 place-items-center rounded-lg ${iconSurface}`}><SelectedIcon size={15} /></span>{iconChoices.find(([value]) => value === icon)?.[1] ?? "自定义"}</span>
+                </div>
+                <div className="mt-2 grid grid-cols-7 gap-2 rounded-2xl bg-[#f5f7f7] p-3 sm:grid-cols-8">
+                  {iconChoices.map(([value, label]) => {
+                    const Icon = categoryIcon(value);
+                    const selected = value === icon;
+                    return <button type="button" key={value} onClick={() => setIcon(value)} aria-label={label} title={label} className={`grid aspect-square place-items-center rounded-xl transition ${selected ? "text-white shadow-sm" : "bg-white text-[#8893a1] hover:text-[#53606b]"}`} style={selected ? { backgroundColor: iconColor } : undefined}><Icon size={19} /></button>;
+                  })}
+                </div>
+              </div>
+            </div>
+            {message && <p className="mt-3 text-center text-sm text-[#c54c2c]">{message}</p>}
+            <button disabled={saving} onClick={submit} className="mt-5 w-full rounded-2xl bg-[#ff714b] py-3.5 font-bold text-white disabled:opacity-60">{saving ? "保存中…" : "保存"}</button>
+          </div>
+        )}
       </section>
     </div>
   );

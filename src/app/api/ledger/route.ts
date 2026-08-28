@@ -24,15 +24,16 @@ export async function POST(request: Request) {
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json()) as {
-    transactionType?: string;
+    transactionType?: "expense" | "income";
     amountCents?: number;
-    categoryName?: string;
+    categoryId?: string;
     note?: string;
   };
   const amountCents = body.amountCents;
   if (
     !body.transactionType ||
-    !body.categoryName ||
+    !body.categoryId ||
+    (body.transactionType !== "expense" && body.transactionType !== "income") ||
     typeof amountCents !== "number" ||
     !Number.isInteger(amountCents) ||
     amountCents <= 0
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
     await createLedgerTransaction(user.id, {
       transactionType: body.transactionType,
       amountCents,
-      categoryName: body.categoryName,
+      categoryId: body.categoryId,
       note: body.note,
     }),
   );
@@ -54,16 +55,17 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json()) as {
     id?: string;
-    transactionType?: string;
+    transactionType?: "expense" | "income";
     amountCents?: number;
-    categoryName?: string;
+    categoryId?: string;
     note?: string;
   };
   const amountCents = body.amountCents;
   if (
     !body.id ||
     !body.transactionType ||
-    !body.categoryName ||
+    !body.categoryId ||
+    (body.transactionType !== "expense" && body.transactionType !== "income") ||
     typeof amountCents !== "number" ||
     !Number.isInteger(amountCents) ||
     amountCents <= 0
@@ -72,7 +74,7 @@ export async function PATCH(request: Request) {
   const transaction = await updateLedgerTransaction(user.id, body.id, {
     transactionType: body.transactionType,
     amountCents,
-    categoryName: body.categoryName,
+    categoryId: body.categoryId,
     note: body.note,
   });
   if (!transaction)

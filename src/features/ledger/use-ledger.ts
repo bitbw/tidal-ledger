@@ -10,11 +10,22 @@ export type LedgerTransaction = {
   merchantName: string | null;
   note: string | null;
   accountId: string | null;
+  categoryId: string | null;
   categoryName: string | null;
+};
+export type LedgerCategory = {
+  id: string;
+  name: string;
+  kind: "expense" | "income";
+  parentId: string | null;
+  icon: string | null;
+  color: string;
+  sortOrder: number;
 };
 type LedgerPayload = {
   book: { id: string; name: string };
   accounts: { id: string; name: string; color: string }[];
+  categories: LedgerCategory[];
   transactions: LedgerTransaction[];
 };
 
@@ -46,9 +57,9 @@ export function useLedger(enabled: boolean) {
   }, [refresh]);
   const addTransaction = useCallback(
     async (input: {
-      transactionType: string;
+      transactionType: "expense" | "income";
       amountCents: number;
-      categoryName: string;
+      categoryId: string;
       note?: string;
     }) => {
       const result = await fetch("/api/ledger", {
@@ -69,9 +80,9 @@ export function useLedger(enabled: boolean) {
   const updateTransaction = useCallback(
     async (input: {
       id: string;
-      transactionType: string;
+      transactionType: "expense" | "income";
       amountCents: number;
-      categoryName: string;
+      categoryId: string;
       note?: string;
     }) => {
       const result = await fetch("/api/ledger", {
@@ -89,6 +100,40 @@ export function useLedger(enabled: boolean) {
     },
     [refresh],
   );
+  const requestCategory = useCallback(
+    async (url: string, method: "POST" | "PATCH" | "DELETE", input?: {
+      name: string;
+      kind: "expense" | "income";
+      parentId?: string | null;
+      icon?: string | null;
+      color?: string;
+    },) => {
+      const result = await fetch(url, {
+        method,
+        headers: input ? { "Content-Type": "application/json" } : undefined,
+        body: input ? JSON.stringify(input) : undefined,
+      });
+      if (!result.ok) {
+        const body = (await result.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? "分类操作失败。");
+      }
+      await refresh();
+      return (await result.json()) as LedgerCategory;
+    },
+    [refresh],
+  );
+  const createCategory = useCallback(
+    (input: { name: string; kind: "expense" | "income"; parentId?: string | null; icon?: string | null; color?: string }) => requestCategory("/api/categories", "POST", input),
+    [requestCategory],
+  );
+  const updateCategory = useCallback(
+    (id: string, input: { name: string; kind: "expense" | "income"; parentId?: string | null; icon?: string | null; color?: string }) => requestCategory(`/api/categories/${id}`, "PATCH", input),
+    [requestCategory],
+  );
+  const archiveCategory = useCallback(
+    (id: string) => requestCategory(`/api/categories/${id}`, "DELETE"),
+    [requestCategory],
+  );
   const totals = useMemo(
     () =>
       (data?.transactions ?? []).reduce(
@@ -105,12 +150,16 @@ export function useLedger(enabled: boolean) {
   return {
     book: data?.book ?? null,
     accounts: data?.accounts ?? [],
+    categories: data?.categories ?? [],
     transactions: data?.transactions ?? [],
     loading,
     error,
     refresh,
     addTransaction,
     updateTransaction,
+    createCategory,
+    updateCategory,
+    archiveCategory,
     totals: { ...totals, balance: totals.income - totals.expense },
   };
 }
