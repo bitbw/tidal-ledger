@@ -48,6 +48,8 @@ import {
   type LedgerCategory,
   type LedgerTransaction,
 } from "@/features/ledger/use-ledger";
+import { ReportsView as LedgerReportsView } from "@/features/ledger/reports-view";
+import { useRecurringEntries, type RecurringEntry, type RecurringInput } from "@/features/ledger/use-recurring-entries";
 import { useSession } from "@/lib/auth/client";
 
 type View = "home" | "reports" | "accounts" | "plans" | "transactions";
@@ -239,6 +241,7 @@ export default function HomePage() {
   const [toast, setToast] = useState("");
   const [mobileMenu, setMobileMenu] = useState(false);
   const ledger = useLedger(Boolean(session?.user));
+  const recurring = useRecurringEntries(Boolean(session?.user));
 
   const selectableCategories = useMemo(
     () =>
@@ -508,13 +511,17 @@ export default function HomePage() {
               setImportOpen(true);
               setImportStep("choose");
             }}
+            onOpenRecurring={() => setView("plans")}
             totals={ledger.totals}
             transactionCount={ledger.transactions.length}
             transactions={ledger.transactions}
           />
         )}
         {view === "reports" && (
-          <ReportsView transactions={ledger.transactions} />
+          <LedgerReportsView
+            enabled={Boolean(session?.user)}
+            onEdit={openTransactionEditor}
+          />
         )}
         {view === "transactions" && (
           <TransactionsView
@@ -529,7 +536,7 @@ export default function HomePage() {
           />
         )}
         {view === "accounts" && <AccountsView />}
-        {view === "plans" && <PlansView />}
+        {view === "plans" && <PlansView recurring={recurring} categories={ledger.categories} accounts={ledger.accounts} />}
       </section>
 
       <button
@@ -602,6 +609,7 @@ function HomeView({
   totals,
   transactionCount,
   transactions,
+  onOpenRecurring,
 }: {
   onCompose: () => void;
   onEdit: (transaction: LedgerTransaction) => void;
@@ -611,6 +619,7 @@ function HomeView({
   totals: { income: number; expense: number; balance: number };
   transactionCount: number;
   transactions: LedgerTransaction[];
+  onOpenRecurring: () => void;
 }) {
   const displayRecent = transactions.slice(0, 3).map((item) => ({
     transaction: item,
@@ -741,7 +750,7 @@ function HomeView({
       <CalendarCard transactions={transactions} onSelectDay={onSelectDay} />
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <QuickAction icon={CalendarDays} label="账单日历" color="#f49a5d" />
-        <QuickAction icon={Clock3} label="周期账" color="#8366e8" />
+        <QuickAction icon={Clock3} label="周期账" color="#8366e8" onClick={onOpenRecurring} />
         <QuickAction
           icon={FileUp}
           label="导入账单"
@@ -1558,61 +1567,109 @@ function AccountsView() {
   );
 }
 
-function PlansView() {
+type RecurringStore = ReturnType<typeof useRecurringEntries>;
+
+function recurringLabel(entry: Pick<RecurringEntry, "intervalCount" | "intervalUnit">) {
+  const unit = entry.intervalUnit === "day" ? "天" : entry.intervalUnit === "week" ? "周" : entry.intervalUnit === "month" ? "月" : "年";
+  return entry.intervalCount === 1 ? `每${unit}` : `每 ${entry.intervalCount} ${unit}`;
+}
+
+function PlansView({ recurring, categories, accounts }: { recurring: RecurringStore; categories: LedgerCategory[]; accounts: { id: string; name: string; color: string }[] }) {
+  const [tab, setTab] = useState<"active" | "ended">("active");
+  const [formOpen, setFormOpen] = useState(false);
+  const [selected, setSelected] = useState<RecurringEntry | null>(null);
+  const [detail, setDetail] = useState<(RecurringEntry & { generated: { id: string; occurredAt: string; amountCents: number; note: string | null }[] }) | null>(null);
+  const [message, setMessage] = useState("");
+  const entries = tab === "active" ? recurring.active : recurring.ended;
+  const openDetail = async (entry: RecurringEntry) => {
+    try { setDetail(await recurring.get(entry.id)); }
+    catch (error) { setMessage(error instanceof Error ? error.message : "读取详情失败"); }
+  };
+  const end = async (id: string) => {
+    if (!window.confirm("结束后将不再生成未来流水，已生成流水会保留。确认结束？")) return;
+    try { await recurring.end(id); setDetail(null); setMessage("周期账已结束"); }
+    catch (error) { setMessage(error instanceof Error ? error.message : "操作失败"); }
+  };
+  const archive = async (id: string) => {
+    if (!window.confirm("删除会归档周期规则，已生成流水不会删除。确认继续？")) return;
+    try { await recurring.archive(id); setDetail(null); setMessage("周期账已归档"); }
+    catch (error) { setMessage(error instanceof Error ? error.message : "操作失败"); }
+  };
   return (
-    <div className="grid gap-5 lg:grid-cols-[1.2fr_.8fr]">
-      <section className="card soft-shadow p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xl font-bold">八月预算</p>
-            <p className="mt-1 text-sm text-[#8b94a3]">控制节奏，不控制生活</p>
-          </div>
-          <Settings2 size={19} className="text-[#7d8792]" />
-        </div>
-        <div className="mt-8 flex items-end justify-between">
-          <div>
-            <p className="text-sm text-[#8b94a3]">已使用</p>
-            <p className="money mt-1 text-3xl font-bold">¥6,345.54</p>
-          </div>
-          <p className="text-right text-sm text-[#8b94a3]">
-            总预算
-            <br />
-            <b className="money text-xl text-[#20252b]">¥10,000.00</b>
-          </p>
-        </div>
-        <div className="mt-6 h-3 overflow-hidden rounded-full bg-[#edf1f1]">
-          <div className="h-full w-[63.5%] rounded-full bg-[#28c5b4]" />
-        </div>
-        <div className="mt-3 flex justify-between text-sm">
-          <span className="text-[#28a99d]">仍有 ¥3,654.46 可用</span>
-          <span className="text-[#8b94a3]">63.45%</span>
-        </div>
+    <div className="mx-auto max-w-3xl space-y-5">
+      <section className="card soft-shadow overflow-hidden">
+        <div className="flex items-center justify-between border-b border-[#edf0f0] px-5 py-5 md:px-6"><div><h2 className="text-xl font-bold">周期账管理</h2><p className="mt-1 text-sm text-[#8b94a3]">固定的收入和支出，到期自动入账</p></div><button onClick={() => { setSelected(null); setFormOpen(true); }} className="rounded-xl bg-[#ff714b] px-4 py-2.5 text-sm font-bold text-white"><Plus className="mr-1 inline" size={17} />添加</button></div>
+        <div className="flex border-b border-[#edf0f0] px-5 md:px-6"><button onClick={() => setTab("active")} className={`border-b-2 px-1 py-3 text-sm font-bold ${tab === "active" ? "border-[#0c6f78] text-[#0c6f78]" : "border-transparent text-[#8b94a3]"}`}>进行中 {recurring.active.length}</button><button onClick={() => setTab("ended")} className={`ml-6 border-b-2 px-1 py-3 text-sm font-bold ${tab === "ended" ? "border-[#ff714b] text-[#ff714b]" : "border-transparent text-[#8b94a3]"}`}>已终止 {recurring.ended.length}</button></div>
+        <div className="divide-y divide-[#edf0f0]">{recurring.loading ? <p className="p-8 text-center text-sm text-[#8b94a3]">正在读取周期账…</p> : entries.length ? entries.map((entry) => <RecurringRow entry={entry} key={entry.id} onClick={() => void openDetail(entry)} />) : <div className="p-10 text-center"><Clock3 className="mx-auto text-[#aab4bd]" size={30} /><p className="mt-3 font-medium">{tab === "active" ? "还没有进行中的周期账" : "没有已终止的周期账"}</p><p className="mt-1 text-sm text-[#8b94a3]">例如每月房租、工资、订阅费用。</p></div>}</div>
       </section>
-      <section className="card p-6">
-        <p className="font-bold">本月提醒</p>
-        <div className="mt-5 space-y-4">
-          <div className="flex items-center gap-3">
-            <span className="grid size-9 place-items-center rounded-xl bg-[#fff0eb] text-[#ff714b]">
-              <CalendarDays size={18} />
-            </span>
-            <div>
-              <p className="text-sm font-medium">房租将在 3 天后生成</p>
-              <p className="text-xs text-[#8b94a3]">每月 1 日 · ¥3,500.00</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="grid size-9 place-items-center rounded-xl bg-[#e8f6f4] text-[#0c6f78]">
-              <Target size={18} />
-            </span>
-            <div>
-              <p className="text-sm font-medium">旅行基金已完成 62%</p>
-              <p className="text-xs text-[#8b94a3]">目标 ¥12,000.00</p>
-            </div>
-          </div>
-        </div>
-      </section>
+      {recurring.error && <p className="rounded-xl bg-[#fff0ed] px-4 py-3 text-sm text-[#c54c2c]">{recurring.error}</p>}
+      {message && <p className="rounded-xl bg-[#eaf8f6] px-4 py-3 text-sm text-[#0c6f78]">{message}</p>}
+      {formOpen && <RecurringForm entry={selected} categories={categories} accounts={accounts} onClose={() => setFormOpen(false)} onSave={async (input) => { if (selected) await recurring.update(selected.id, input); else await recurring.create(input); setFormOpen(false); setMessage(selected ? "周期账已更新" : "周期账已创建"); }} />}
+      {detail && <RecurringDetail detail={detail} onClose={() => setDetail(null)} onEdit={() => { setSelected(detail); setDetail(null); setFormOpen(true); }} onEnd={() => void end(detail.id)} onArchive={() => void archive(detail.id)} />}
     </div>
   );
+}
+
+function RecurringRow({ entry, onClick }: { entry: RecurringEntry; onClick: () => void }) {
+  const Icon = categoryIcon(entry.categoryIcon);
+  const income = entry.transactionType === "income";
+  return <button onClick={onClick} className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-[#fafcfc] md:px-6"><span className={`grid size-11 place-items-center rounded-2xl ${income ? "bg-[#fff0eb] text-[#ff714b]" : "bg-[#e4f7f4] text-[#28b9aa]"}`}><Icon size={21} /></span><div className="min-w-0 flex-1"><p className="font-semibold">{entry.categoryName}</p><p className="mt-1 truncate text-sm text-[#8b94a3]">{entry.note || "无备注"}</p><p className="mt-1 text-xs text-[#a2abb4]">{entry.status === "active" ? `下次 ${new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(entry.nextRunAt))}` : "已终止"} · {recurringLabel(entry)}</p></div><b className={`money text-xl ${income ? "text-[#ff714b]" : "text-[#20252b]"}`}>{income ? "+" : "-"}¥{yuan(entry.amountCents / 100)}</b><ChevronRight className="text-[#a5adb6]" size={18} /></button>;
+}
+
+function toDateTimeLocal(value: string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function RecurringForm({ entry, categories, accounts, onClose, onSave }: {
+  entry: RecurringEntry | null;
+  categories: LedgerCategory[];
+  accounts: { id: string; name: string; color: string }[];
+  onClose: () => void;
+  onSave: (input: RecurringInput) => Promise<void>;
+}) {
+  const [kind, setKind] = useState<"expense" | "income">(entry?.transactionType ?? "expense");
+  const [categoryId, setCategoryId] = useState(entry?.categoryId ?? "");
+  const expenseRoots = categories.filter((category) => category.kind === "expense" && !category.parentId);
+  const [activeExpenseParentId, setActiveExpenseParentId] = useState(() => {
+    const selected = categories.find((category) => category.id === entry?.categoryId);
+    return selected?.parentId ?? expenseRoots[0]?.id ?? "";
+  });
+  const expenseChildren = categories.filter((category) => category.kind === "expense" && category.parentId === activeExpenseParentId);
+  const incomeCategories = categories.filter((category) => category.kind === "income" && !category.parentId);
+  const [accountId, setAccountId] = useState(entry?.accountId ?? "");
+  const [amount, setAmount] = useState(entry ? String(entry.amountCents / 100) : "");
+  const [note, setNote] = useState(entry?.note ?? "");
+  const [intervalCount, setIntervalCount] = useState(String(entry?.intervalCount ?? 1));
+  const [intervalUnit, setIntervalUnit] = useState<RecurringInput["intervalUnit"]>(entry?.intervalUnit ?? "month");
+  const [startAt, setStartAt] = useState(toDateTimeLocal(entry?.startAt) || toDateTimeLocal(new Date().toISOString()));
+  const [hasEndAt, setHasEndAt] = useState(Boolean(entry?.endAt));
+  const [endAt, setEndAt] = useState(toDateTimeLocal(entry?.endAt));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const setTransactionKind = (next: "expense" | "income") => { setKind(next); setCategoryId(""); };
+  const submit = async () => {
+    const amountCents = Math.round(Number(amount) * 100);
+    const count = Number(intervalCount);
+    if (!categoryId) { setError("请选择分类。"); return; }
+    if (!Number.isFinite(amountCents) || amountCents <= 0) { setError("请输入大于 0 的金额。"); return; }
+    if (!startAt) { setError("请选择开始时间。"); return; }
+    setSaving(true); setError("");
+    try { await onSave({ transactionType: kind, categoryId, accountId: accountId || null, amountCents, note, intervalCount: count, intervalUnit, startAt: new Date(startAt).toISOString(), endAt: hasEndAt && endAt ? new Date(endAt).toISOString() : null }); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "保存失败。"); }
+    finally { setSaving(false); }
+  };
+  return <div className="fixed inset-0 z-50 flex items-end bg-[#102124]/35 p-0 backdrop-blur-sm md:items-center md:justify-center md:p-5"><section className="max-h-[100dvh] w-full overflow-y-auto rounded-t-[28px] bg-[#f5f7f7] shadow-2xl md:max-w-[620px] md:rounded-[28px]"><header className="flex items-center justify-between bg-[#0c6f78] px-5 py-5 text-white md:px-6"><div><p className="text-lg font-bold">{entry ? "编辑周期账" : "新增周期账"}</p><p className="mt-1 text-sm text-white/70">到期后会自动生成一笔流水</p></div><button onClick={onClose} disabled={saving} className="grid size-9 place-items-center rounded-full bg-white/10"><X size={19} /></button></header><div className="space-y-5 p-5 md:p-6"><div className="grid grid-cols-2 rounded-2xl bg-[#e8eeee] p-1"><button onClick={() => setTransactionKind("expense")} disabled={saving} className={`rounded-xl py-2.5 text-sm font-bold ${kind === "expense" ? "bg-white text-[#0c6f78] shadow-sm" : "text-[#84909a]"}`}>支出</button><button onClick={() => setTransactionKind("income")} disabled={saving} className={`rounded-xl py-2.5 text-sm font-bold ${kind === "income" ? "bg-white text-[#ff714b] shadow-sm" : "text-[#84909a]"}`}>收入</button></div><section><div className="flex items-baseline justify-between"><p className="text-sm font-bold text-[#4d5863]">分类</p><p className="text-xs text-[#98a1aa]">{kind === "expense" ? "先选大类，再选小类" : "选择收入分类"}</p></div>{kind === "expense" ? <div className="mt-2 space-y-3"><div className="flex gap-2 overflow-x-auto pb-1">{expenseRoots.map((category) => { const Icon = categoryIcon(category.icon); const selected = category.id === activeExpenseParentId; return <button key={category.id} onClick={() => { setActiveExpenseParentId(category.id); if (categories.find((item) => item.id === categoryId)?.parentId !== category.id) setCategoryId(""); }} disabled={saving} className={`flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold transition ${selected ? "border-[#28c5b4] bg-[#e4f7f4] text-[#0c6f78]" : "border-[#dde5e5] bg-white text-[#66727d]"}`}><Icon size={16} />{category.name}</button>; })}</div><div className="rounded-2xl bg-white p-3"><p className="mb-2 text-xs font-bold text-[#8b94a3]">选择小类</p><div className="grid grid-cols-3 gap-2 sm:grid-cols-4">{expenseChildren.map((category) => { const Icon = categoryIcon(category.icon); const selected = category.id === categoryId; return <button key={category.id} onClick={() => setCategoryId(category.id)} disabled={saving} className={`grid min-h-20 place-items-center gap-1 rounded-xl border px-1 py-2 text-xs font-medium transition ${selected ? "border-[#28c5b4] bg-[#e4f7f4] text-[#0c6f78]" : "border-[#edf0f0] text-[#66727d] hover:bg-[#f8fbfb]"}`}><Icon size={18} /><span className="max-w-full truncate">{category.name}</span></button>; })}</div>{!expenseChildren.length && <p className="py-4 text-center text-sm text-[#8b94a3]">这个大类还没有小类，请先到分类管理中添加。</p>}</div></div> : <div className="mt-2 grid grid-cols-3 gap-2 rounded-2xl bg-white p-3 sm:grid-cols-4">{incomeCategories.map((category) => { const Icon = categoryIcon(category.icon); const selected = category.id === categoryId; return <button key={category.id} onClick={() => setCategoryId(category.id)} disabled={saving} className={`grid min-h-20 place-items-center gap-1 rounded-xl border px-1 py-2 text-xs font-medium transition ${selected ? "border-[#ff714b] bg-[#fff0eb] text-[#ff714b]" : "border-[#edf0f0] text-[#66727d] hover:bg-[#fff9f7]"}`}><Icon size={18} /><span className="max-w-full truncate">{category.name}</span></button>; })}</div>}</section><div className="grid gap-4 sm:grid-cols-2"><label className="block text-sm font-bold text-[#4d5863]">金额<input value={amount} onChange={(event) => setAmount(event.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="0.00" disabled={saving} className="money mt-2 w-full rounded-xl border border-[#dde5e5] bg-white px-3 py-3 text-xl font-bold outline-none" /></label><label className="block text-sm font-bold text-[#4d5863]">账户（可选）<select value={accountId} onChange={(event) => setAccountId(event.target.value)} disabled={saving} className="mt-2 w-full rounded-xl border border-[#dde5e5] bg-white px-3 py-3 font-normal outline-none"><option value="">不指定账户</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label></div><label className="block text-sm font-bold text-[#4d5863]">开始时间<input value={startAt} onChange={(event) => setStartAt(event.target.value)} type="datetime-local" disabled={saving} className="mt-2 w-full rounded-xl border border-[#dde5e5] bg-white px-3 py-3 font-normal outline-none" /></label><div><p className="text-sm font-bold text-[#4d5863]">重复周期</p><div className="mt-2 flex gap-2"><input value={intervalCount} onChange={(event) => setIntervalCount(event.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" disabled={saving} className="w-24 rounded-xl border border-[#dde5e5] bg-white px-3 py-3 text-center font-bold outline-none" /><select value={intervalUnit} onChange={(event) => setIntervalUnit(event.target.value as RecurringInput["intervalUnit"])} disabled={saving} className="flex-1 rounded-xl border border-[#dde5e5] bg-white px-3 py-3 outline-none"><option value="day">天</option><option value="week">周</option><option value="month">月</option><option value="year">年</option></select></div></div><div className="rounded-2xl bg-white p-4"><label className="flex items-center justify-between gap-3 text-sm font-bold text-[#4d5863]"><span>设置结束时间</span><input checked={hasEndAt} onChange={(event) => setHasEndAt(event.target.checked)} disabled={saving} className="size-4 accent-[#0c6f78]" type="checkbox" /></label>{hasEndAt && <input value={endAt} onChange={(event) => setEndAt(event.target.value)} type="datetime-local" disabled={saving} className="mt-3 w-full rounded-xl border border-[#dde5e5] px-3 py-3 font-normal outline-none" />}</div><label className="block text-sm font-bold text-[#4d5863]">备注<input value={note} onChange={(event) => setNote(event.target.value)} disabled={saving} placeholder="例如：每月房租" className="mt-2 w-full rounded-xl border border-[#dde5e5] bg-white px-3 py-3 font-normal outline-none" /></label>{error && <p className="rounded-xl bg-[#fff0ed] px-3 py-2 text-sm text-[#c54c2c]">{error}</p>}<button onClick={() => void submit()} disabled={saving} className="w-full rounded-2xl bg-[#0c6f78] py-3.5 font-bold text-white disabled:opacity-60">{saving ? "正在保存…" : "保存周期账"}</button></div></section></div>;
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) { return <div className="flex items-center justify-between gap-5 py-3 text-sm"><span className="text-[#8b94a3]">{label}</span><span className="text-right font-medium text-[#3f4852]">{value}</span></div>; }
+
+function RecurringDetail({ detail, onClose, onEdit, onEnd, onArchive }: { detail: RecurringEntry & { generated: { id: string; occurredAt: string; amountCents: number; note: string | null }[] }; onClose: () => void; onEdit: () => void; onEnd: () => void; onArchive: () => void }) {
+  const income = detail.transactionType === "income"; const Icon = categoryIcon(detail.categoryIcon); const formatDate = (value: string) => new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+  return <div className="fixed inset-0 z-50 grid place-items-center bg-[#102124]/35 p-4 backdrop-blur-sm"><section className="max-h-[90dvh] w-full max-w-[580px] overflow-y-auto rounded-[28px] bg-[#f5f7f7] shadow-2xl"><header className="flex items-center justify-between bg-[#0c6f78] px-6 py-5 text-white"><div><p className="text-lg font-bold">周期账详情</p><p className="mt-1 text-sm text-white/70">{detail.status === "active" ? "正在进行" : "已终止"}</p></div><button onClick={onClose} className="grid size-9 place-items-center rounded-full bg-white/10"><X size={19} /></button></header><div className="space-y-4 p-5 md:p-6"><section className="rounded-2xl bg-white p-5"><div className="flex items-center gap-3"><span className={`grid size-12 place-items-center rounded-2xl ${income ? "bg-[#fff0eb] text-[#ff714b]" : "bg-[#e4f7f4] text-[#28b9aa]"}`}><Icon size={23} /></span><div className="min-w-0 flex-1"><p className="font-bold">{detail.categoryName}</p><p className="mt-1 text-sm text-[#8b94a3]">{detail.note || "无备注"}</p></div><b className={`money text-2xl ${income ? "text-[#ff714b]" : "text-[#20252b]"}`}>{income ? "+" : "-"}¥{yuan(detail.amountCents / 100)}</b></div><div className="mt-4 divide-y divide-[#edf0f0]"><DetailRow label="账户" value={detail.accountName || "未指定账户"} /><DetailRow label="重复" value={recurringLabel(detail)} /><DetailRow label="开始" value={formatDate(detail.startAt)} /><DetailRow label="下次入账" value={detail.status === "active" ? formatDate(detail.nextRunAt) : "已结束"} />{detail.endAt && <DetailRow label="结束时间" value={formatDate(detail.endAt)} />}</div></section><section className="rounded-2xl bg-white p-5"><div className="flex items-center justify-between"><p className="font-bold">已生成流水</p><span className="text-sm text-[#8b94a3]">共 {detail.generated.length} 笔</span></div>{detail.generated.length ? <div className="mt-3 divide-y divide-[#edf0f0]">{detail.generated.slice(0, 5).map((item) => <div key={item.id} className="flex items-center justify-between py-3 text-sm"><span className="text-[#68737d]">{new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(item.occurredAt))}</span><b className={`money ${income ? "text-[#ff714b]" : "text-[#20252b]"}`}>{income ? "+" : "-"}¥{yuan(item.amountCents / 100)}</b></div>)}</div> : <p className="mt-3 text-sm text-[#8b94a3]">尚未到生成时间。</p>}</section><div className="grid gap-3 sm:grid-cols-2"><button onClick={onEdit} className="rounded-2xl bg-[#0c6f78] py-3 font-bold text-white">编辑</button>{detail.status === "active" ? <button onClick={onEnd} className="rounded-2xl border border-[#f2c1b6] bg-[#fff8f6] py-3 font-bold text-[#d55a3e]">结束周期账</button> : <button onClick={onArchive} className="rounded-2xl border border-[#e1e5e6] bg-white py-3 font-bold text-[#68737d]">归档规则</button>}</div>{detail.status === "active" && <button onClick={onArchive} className="w-full py-2 text-sm font-medium text-[#9aa4ad] underline underline-offset-4">删除并归档此规则</button>}</div></section></div>;
 }
 
 function Composer({
