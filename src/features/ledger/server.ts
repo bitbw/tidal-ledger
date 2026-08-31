@@ -17,6 +17,7 @@ export type TransactionInput = {
   amountCents: number;
   categoryId: string;
   note?: string;
+  occurredAt?: string;
 };
 
 export type CategoryInput = {
@@ -293,6 +294,8 @@ export async function createLedgerTransaction(userId: string, input: Transaction
     .orderBy(accounts.createdAt)
     .limit(1);
   const category = await getTransactionCategory(bookId, input.transactionType, input.categoryId);
+  const occurredAt = input.occurredAt ? new Date(input.occurredAt) : new Date();
+  if (Number.isNaN(occurredAt.getTime())) throw new Error("记账时间不正确。");
   const [transaction] = await db
     .insert(transactions)
     .values({
@@ -301,7 +304,7 @@ export async function createLedgerTransaction(userId: string, input: Transaction
       categoryId: category.id,
       transactionType: input.transactionType,
       amountCents: input.amountCents,
-      occurredAt: new Date(),
+      occurredAt,
       merchantName: category.name,
       note: input.note ?? null,
       source: "manual",
@@ -318,11 +321,14 @@ export async function updateLedgerTransaction(
 ) {
   const bookId = await ensureDefaultLedger(userId);
   const category = await getTransactionCategory(bookId, input.transactionType, input.categoryId);
+  const occurredAt = input.occurredAt ? new Date(input.occurredAt) : null;
+  if (input.occurredAt && occurredAt && Number.isNaN(occurredAt.getTime())) throw new Error("记账时间不正确。");
   const [transaction] = await db
     .update(transactions)
     .set({
       transactionType: input.transactionType,
       amountCents: input.amountCents,
+      ...(occurredAt ? { occurredAt } : {}),
       categoryId: category.id,
       merchantName: category.name,
       note: input.note ?? null,

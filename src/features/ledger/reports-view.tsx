@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { BarChart3, ChevronLeft, ChevronRight, CircleDollarSign, ListFilter, LoaderCircle, TrendingDown, TrendingUp, WalletCards, X } from "lucide-react";
+import ReactECharts from "echarts-for-react";
 import { useLedgerReport } from "@/features/ledger/use-ledger-report";
 import { useLedgerTransactions } from "@/features/ledger/use-ledger-transactions";
 import type { CategoryReportItem, LedgerReportScope, ReportBucket, ReportDetailFilter, ReportScopeType, ReportTransaction } from "@/features/ledger/report-types";
@@ -116,48 +117,19 @@ function TrendCard({ title, color, type, buckets, scope, onDetail }: { title: st
   </section>;
 }
 
-function smoothPath(points: { x: number; y: number }[]) {
-  if (points.length < 2) return "";
-  return points.reduce((path, point, index) => {
-    if (!index) return `M ${point.x} ${point.y}`;
-    const previous = points[index - 1];
-    const next = points[index + 1] ?? point;
-    const controlOneX = previous.x + (point.x - (points[index - 2]?.x ?? previous.x)) / 6;
-    const controlOneY = previous.y + (point.y - (points[index - 2]?.y ?? previous.y)) / 6;
-    const controlTwoX = point.x - (next.x - previous.x) / 6;
-    const controlTwoY = point.y - (next.y - previous.y) / 6;
-    return `${path} C ${controlOneX} ${controlOneY}, ${controlTwoX} ${controlTwoY}, ${point.x} ${point.y}`;
-  }, "");
-}
-
 function TrendChart({ values, color, buckets, onClickIndex }: { values: number[]; color: string; buckets: ReportBucket[]; onClickIndex: (index: number) => void }) {
-  const [activeIndex, setActiveIndex] = useState(() => Math.max(values.findLastIndex((value) => value !== 0), values.length - 1, 0));
   if (!values.length) return <div className="grid h-52 place-items-center text-sm text-[#98a1aa]">暂无趋势数据</div>;
-  const width = 344; const height = 202; const left = 12; const right = 12; const top = 20; const bottom = 164;
-  const min = Math.min(...values, 0); const max = Math.max(...values, 0); const hasNegative = min < 0;
-  const magnitude = hasNegative ? Math.max(Math.abs(min), Math.abs(max), 1) : Math.max(max, 1);
-  const zeroY = hasNegative ? (top + bottom) / 2 : bottom;
-  const yFor = (value: number) => hasNegative ? zeroY - (value / magnitude) * 64 : bottom - (value / magnitude) * (bottom - top - 8);
-  const points = values.map((value, index) => ({ x: left + (index / Math.max(values.length - 1, 1)) * (width - left - right), y: yFor(value) }));
-  const line = smoothPath(points); const area = `${line} L ${points.at(-1)!.x} ${zeroY} L ${points[0].x} ${zeroY} Z`;
+  const labels = buckets.map((bucket) => bucket.label.replace(/^\d{4}年/, ""));
   const average = values.reduce((sum, value) => sum + value, 0) / values.length;
-  const averageY = yFor(average); const active = points[activeIndex] ?? points.at(-1)!; const bucket = buckets[activeIndex];
-  const gradientId = `trend-fill-${color.replace("#", "")}`;
-  const tickIndexes = [...new Set([0, Math.floor((values.length - 1) / 2), values.length - 1])];
-  const tickLabel = (index: number) => { const label = buckets[index]?.label ?? ""; return label.replace(/^\d{4}年/, "").replace(/日$/, ""); };
-  return <svg viewBox={`0 0 ${width} ${height}`} className="h-52 w-full overflow-visible" role="img" aria-label="点击趋势点查看流水">
-    <defs><linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity="0.34" /><stop offset="100%" stopColor={color} stopOpacity="0.025" /></linearGradient></defs>
-    {[0.2, 0.4, 0.6, 0.8].map((ratio) => <line key={ratio} x1={left} x2={width - right} y1={top + (bottom - top) * ratio} y2={top + (bottom - top) * ratio} stroke="#e8eeee" strokeDasharray="3 5" />)}
-    <line x1={left} x2={width - right} y1={averageY} y2={averageY} stroke={color} strokeOpacity="0.38" strokeDasharray="5 5" />
-    <text x={width - right - 1} y={averageY - 6} textAnchor="end" fill="#8d98a2" fontSize="10">均值 ¥{money(Math.round(average))}</text>
-    <path d={area} fill={`url(#${gradientId})`} /><path d={line} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-    <line x1={active.x} x2={active.x} y1={top} y2={bottom} stroke="#cfd8da" strokeWidth="1" />
-    <circle cx={active.x} cy={active.y} r="5.5" fill="white" stroke={color} strokeWidth="3" />
-    {bucket && <g transform={`translate(${Math.min(Math.max(active.x - 47, 5), width - 99)} 1)`}><rect width="94" height="37" rx="7" fill="#f3f6f6" /><text x="47" y="15" textAnchor="middle" fill="#7f8b96" fontSize="10">{bucket.label}</text><text x="47" y="29" textAnchor="middle" fill="#28323a" fontSize="11" fontWeight="700">¥{money(values[activeIndex] ?? 0)}</text></g>}
-    {points.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="12" fill="transparent" className="cursor-pointer" onMouseEnter={() => setActiveIndex(index)} onFocus={() => setActiveIndex(index)} onClick={() => { setActiveIndex(index); onClickIndex(index); }}><title>{buckets[index]?.label}，查看明细</title></circle>)}
-    <line x1={left} x2={width - right} y1={bottom} y2={bottom} stroke="#e2e9e9" />
-    {tickIndexes.map((index) => <text key={index} x={points[index].x} y="187" textAnchor={index === 0 ? "start" : index === values.length - 1 ? "end" : "middle"} fill="#98a1aa" fontSize="10">{tickLabel(index)}</text>)}
-  </svg>;
+  const option = {
+    animationDuration: 350,
+    grid: { left: 8, right: 12, top: 28, bottom: 24, containLabel: true },
+    xAxis: { type: "category", boundaryGap: false, data: labels, axisLine: { lineStyle: { color: "#e2e9e9" } }, axisTick: { show: false }, axisLabel: { color: "#98a1aa", fontSize: 10, interval: "auto" } },
+    yAxis: { type: "value", scale: true, splitNumber: 4, axisLabel: { color: "#98a1aa", fontSize: 10, formatter: (value: number) => `¥${Math.round(value)}` }, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: "#e8eeee", type: "dashed" } } },
+    tooltip: { trigger: "axis", confine: true, enterable: false, transitionDuration: 0.15, backgroundColor: "#f3f6f6", borderColor: "transparent", borderWidth: 0, borderRadius: 9, padding: [9, 13], shadowBlur: 18, shadowColor: "rgba(35, 57, 62, 0.12)", textStyle: { color: "#20252b", fontSize: 12 }, axisPointer: { type: "line", snap: true, lineStyle: { color: "#cfd8da", width: 1 } }, formatter: (params: { dataIndex: number; axisValue: string; value: number }[]) => { const point = params[0]; return `<div style="font-size:12px;line-height:18px;color:#7f8b96">${buckets[point.dataIndex]?.label ?? point.axisValue}</div><div style="font-size:15px;line-height:22px;font-weight:700;color:#20252b">¥${money(Number(point.value))}</div><div style="margin-top:2px;font-size:11px;line-height:16px;color:#8b94a3">点击查看该时间段明细</div>`; } },
+    series: [{ type: "line", data: values, smooth: 0.35, symbol: "circle", symbolSize: 7, showSymbol: values.length <= 31, lineStyle: { color, width: 3 }, itemStyle: { color, borderColor: "#fff", borderWidth: 2 }, areaStyle: { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: `${color}55` }, { offset: 1, color: `${color}05` }] } }, markLine: { silent: true, symbol: "none", lineStyle: { color: `${color}66`, type: "dashed" }, label: { color: "#8d98a2", fontSize: 10, formatter: `均值 ¥${money(Math.round(average))}`, position: "insideEndTop" }, data: [{ yAxis: average }] } }],
+  };
+  return <ReactECharts option={option} style={{ height: 208, width: "100%" }} opts={{ renderer: "canvas" }} onEvents={{ click: (params: { dataIndex: number }) => onClickIndex(params.dataIndex) }} />;
 }
 
 function CategoryPanel({ level, scopeTitleText, startAt, endAt, expense, income, onDetail }: { level: "major" | "minor"; scopeTitleText: string; startAt: string | null; endAt: string | null; expense: CategoryReportItem[]; income: CategoryReportItem[]; onDetail: (filter: ReportDetailFilter) => void }) {
@@ -181,8 +153,15 @@ function CategoryCard({ title, color, type, level, items, scopeTitleText, startA
 }
 
 function Donut({ items, type, color, onPick }: { items: CategoryReportItem[]; type: "income" | "expense"; color: string; onPick: (item: CategoryReportItem) => void }) {
-  const [hovered, setHovered] = useState<CategoryReportItem | null>(null); const topLabels = items.slice(0, 6); const circumference = 2 * Math.PI * 66; let offset = 0; const display = hovered ?? items[0];
-  return <div className="relative mx-auto mb-3 w-full max-w-[360px]"><svg viewBox="0 0 340 268" className="w-full overflow-visible" role="img" aria-label="点击分类扇区查看流水">{items.map((item, index) => { const length = Math.max((item.percentage / 100) * circumference - 1.2, 0); const circle = <circle key={item.id} cx="170" cy="125" r="66" fill="none" stroke={visualColor(item, index, type)} strokeWidth="23" strokeDasharray={`${length} ${circumference - length}`} strokeDashoffset={-offset} transform="rotate(-90 170 125)" className="cursor-pointer transition-opacity hover:opacity-75" onClick={() => onPick(item)} onMouseEnter={() => setHovered(item)} onMouseLeave={() => setHovered(null)} />; offset += (item.percentage / 100) * circumference; return circle; })}<circle cx="170" cy="125" r="50" fill="white" /><text x="170" y="117" textAnchor="middle" fill="#8a96a0" fontSize="12">总{type === "income" ? "收入" : "支出"}</text><text x="170" y="140" textAnchor="middle" fill="#20252b" fontSize="18" fontWeight="700">¥{money(display.amountCents)}</text>{topLabels.map((item, index) => { const before = items.slice(0, index).reduce((sum, value) => sum + value.percentage, 0); const angle = ((before + item.percentage / 2) / 100) * Math.PI * 2 - Math.PI / 2; const isRight = Math.cos(angle) >= 0; const x1 = 170 + Math.cos(angle) * 79; const y1 = 125 + Math.sin(angle) * 79; const x2 = 170 + Math.cos(angle) * 93; const y2 = 125 + Math.sin(angle) * 93; const x3 = isRight ? 326 : 14; return <g key={`label-${item.id}`} className="cursor-pointer" onClick={() => onPick(item)}><path d={`M ${x1} ${y1} L ${x2} ${y2} L ${x3} ${y2}`} fill="none" stroke={visualColor(item, index, type)} strokeOpacity=".65" strokeWidth="1" /><text x={isRight ? x3 - 3 : x3 + 3} y={y2 - 3} textAnchor={isRight ? "end" : "start"} fill="#63707c" fontSize="10.5">{item.name} {item.percentage.toFixed(2)}%</text></g>; })}</svg></div>;
+  const data = items.map((item, index) => ({ name: item.name, value: item.amountCents, item, itemStyle: { color: visualColor(item, index, type) } }));
+  const total = items.reduce((sum, item) => sum + item.amountCents, 0);
+  const option = {
+    animationDuration: 350,
+    tooltip: { trigger: "item", confine: true, backgroundColor: "#f3f6f6", borderColor: "transparent", borderWidth: 0, borderRadius: 9, padding: [9, 13], shadowBlur: 18, shadowColor: "rgba(35, 57, 62, 0.12)", textStyle: { color: "#20252b", fontSize: 12 }, formatter: (params: { name: string; value: number; percent: number }) => `<strong>${params.name}</strong><br/>¥${money(params.value)} · ${params.percent.toFixed(2)}%` },
+    series: [{ type: "pie", radius: ["42%", "68%"], center: ["50%", "50%"], avoidLabelOverlap: false, minAngle: 1, itemStyle: { borderColor: "#fff", borderWidth: 2 }, label: { show: true, color: "#63707c", fontSize: 10, formatter: (params: { name: string; percent: number }) => `${params.name} ${params.percent.toFixed(2)}%`, lineHeight: 14, overflow: "break" }, labelLine: { show: true, length: 14, length2: 18, smooth: false, lineStyle: { width: 1 } }, labelLayout: { hideOverlap: false, moveOverlap: "shiftY", draggable: false }, emphasis: { scale: true, scaleSize: 4, label: { show: true, fontWeight: 700 } }, data }],
+    graphic: [{ type: "text", left: "center", top: "42%", style: { text: `总${type === "income" ? "收入" : "支出"}`, fill: "#8a96a0", fontSize: 12, textAlign: "center" } }, { type: "text", left: "center", top: "51%", style: { text: `¥${money(total)}`, fill: "#20252b", fontSize: 18, fontWeight: 700, textAlign: "center" } }],
+  };
+  return <ReactECharts option={option} style={{ height: Math.max(320, Math.min(440, 280 + items.length * 7)), width: "100%" }} opts={{ renderer: "canvas" }} onEvents={{ click: (params: { dataIndex: number }) => { const item = items[params.dataIndex]; if (item) onPick(item); } }} />;
 }
 
 function FlowCard({ level, expense, income, scopeTitleText, startAt, endAt, onDetail }: { level: "major" | "minor"; expense: CategoryReportItem[]; income: CategoryReportItem[]; scopeTitleText: string; startAt: string; endAt: string; onDetail: (filter: ReportDetailFilter) => void }) {
