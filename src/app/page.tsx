@@ -232,6 +232,7 @@ export default function HomePage() {
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [amount, setAmount] = useState("0");
   const [note, setNote] = useState("");
+  const [occurredAt, setOccurredAt] = useState(() => toDateTimeLocal(new Date().toISOString()));
   const [editingTransaction, setEditingTransaction] =
     useState<LedgerTransaction | null>(null);
   const [saving, setSaving] = useState(false);
@@ -324,6 +325,7 @@ export default function HomePage() {
     switchKind("expense");
     setAmount("0");
     setNote("");
+    setOccurredAt(toDateTimeLocal(new Date().toISOString()));
     setComposerOpen(true);
   }
 
@@ -339,6 +341,7 @@ export default function HomePage() {
     setSelectedCategoryId(transaction.categoryId ?? defaultCategoryId(transactionKind));
     setAmount((transaction.amountCents / 100).toFixed(2));
     setNote(transaction.note || "");
+    setOccurredAt(toDateTimeLocal(transaction.occurredAt));
     setComposerOpen(true);
   }
 
@@ -362,6 +365,7 @@ export default function HomePage() {
           amountCents,
           categoryId: selectedCategoryId,
           note,
+          occurredAt: occurredAt ? new Date(occurredAt).toISOString() : undefined,
         });
       } else {
         await ledger.addTransaction({
@@ -369,11 +373,13 @@ export default function HomePage() {
           amountCents,
           categoryId: selectedCategoryId,
           note,
+          occurredAt: occurredAt ? new Date(occurredAt).toISOString() : undefined,
         });
       }
       setComposerOpen(false);
       setAmount("0");
       setNote("");
+      setOccurredAt(toDateTimeLocal(new Date().toISOString()));
       setEditingTransaction(null);
       setToast(
         editingTransaction ? "流水已更新" : `${kindLabel}已保存到云端账本`,
@@ -574,6 +580,8 @@ export default function HomePage() {
           archiveCategory={ledger.archiveCategory}
           amount={amount}
           note={note}
+          occurredAt={occurredAt}
+          setOccurredAt={setOccurredAt}
           editing={Boolean(editingTransaction)}
           saving={saving}
           inputNumber={inputNumber}
@@ -1687,6 +1695,8 @@ function Composer({
   archiveCategory,
   amount,
   note,
+  occurredAt,
+  setOccurredAt,
   editing,
   saving,
   inputNumber,
@@ -1710,6 +1720,8 @@ function Composer({
   archiveCategory: (id: string) => Promise<LedgerCategory>;
   amount: string;
   note: string;
+  occurredAt: string;
+  setOccurredAt: (value: string) => void;
   editing: boolean;
   saving: boolean;
   inputNumber: (value: string) => void;
@@ -1872,8 +1884,22 @@ function Composer({
             className="mt-10 w-full bg-transparent text-base outline-none placeholder:text-[#a7b0bb]"
             placeholder="输入备注…"
           />
+          <label className="mt-5 block text-sm font-medium text-[#71808b]">
+            发生时间
+            <span className="mt-2 flex items-center rounded-xl bg-white px-3 py-2.5 shadow-sm">
+              <CalendarDays size={16} className="mr-2 shrink-0 text-[#0c6f78]" />
+              <input
+                type="datetime-local"
+                value={occurredAt}
+                onChange={(event) => setOccurredAt(event.target.value)}
+                disabled={saving}
+                className="min-w-0 flex-1 bg-transparent text-sm font-medium text-[#3f4852] outline-none"
+                aria-label="发生日期和时间"
+              />
+            </span>
+          </label>
           <div className="mt-5 flex gap-2 overflow-x-auto pb-2">
-            {["今天 13:00", "支付宝", "自己", "商家", "标签"].map(
+            {["支付宝", "自己", "商家", "标签"].map(
               (item, index) => (
                 <button
                   className="shrink-0 rounded-full bg-white px-3 py-2 text-sm text-[#53606b] shadow-sm"

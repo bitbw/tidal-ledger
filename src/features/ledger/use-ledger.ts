@@ -61,6 +61,7 @@ export function useLedger(enabled: boolean) {
       amountCents: number;
       categoryId: string;
       note?: string;
+      occurredAt?: string;
     }) => {
       const result = await fetch("/api/ledger", {
         method: "POST",
@@ -84,6 +85,7 @@ export function useLedger(enabled: boolean) {
       amountCents: number;
       categoryId: string;
       note?: string;
+      occurredAt?: string;
     }) => {
       const result = await fetch("/api/ledger", {
         method: "PATCH",

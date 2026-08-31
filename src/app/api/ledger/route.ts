@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     amountCents?: number;
     categoryId?: string;
     note?: string;
+    occurredAt?: string;
   };
   const amountCents = body.amountCents;
   if (
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
       amountCents,
       categoryId: body.categoryId,
       note: body.note,
+      occurredAt: body.occurredAt,
     }),
   );
 }
@@ -63,6 +65,7 @@ export async function PATCH(request: Request) {
     amountCents?: number;
     categoryId?: string;
     note?: string;
+    occurredAt?: string;
   };
   const amountCents = body.amountCents;
   if (
@@ -80,6 +83,7 @@ export async function PATCH(request: Request) {
     amountCents,
     categoryId: body.categoryId,
     note: body.note,
+    occurredAt: body.occurredAt,
   });
   if (!transaction)
     return NextResponse.json(
