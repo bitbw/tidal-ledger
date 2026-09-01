@@ -1,8 +1,11 @@
 import { createHash } from "node:crypto";
-import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { createGateway } from "@ai-sdk/gateway";
+import { generateObject } from "ai";
+import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { ensureDefaultLedger } from "@/features/ledger/server";
-import { accounts, categories, importBatches, importRows, transactions } from "@/features/ledger/schema";
+import { accounts, categories, importBatches, importCategoryRules, importRows, transactions } from "@/features/ledger/schema";
 
 export type ImportSource = "wechat" | "alipay" | "generic";
 export type ImportDirection = "income" | "expense" | "unknown";
@@ -19,10 +22,104 @@ export type ImportCandidate = {
   note: string;
   externalTransactionId: string | null;
   enabled: boolean;
+  platformCategory?: string;
+  productName?: string;
+};
+
+export type ImportRuleInput = {
+  pattern: string;
+  matchType: "exact" | "contains";
+  direction: "expense" | "income" | "any";
+  categoryId: string;
+  priority?: number;
+  enabled?: boolean;
 };
 
 function clean(value: string | null | undefined) {
   return (value ?? "").trim().replace(/\s+/g, " ");
+}
+
+function normalizeRuleText(value: string | undefined) {
+  return (value ?? "").trim().toLowerCase().replace(/\s+/g, "");
+}
+
+function validRuleInput(input: ImportRuleInput) {
+  const pattern = clean(input.pattern);
+  if (!pattern || pattern.length > 80) throw new Error("规则关键词需为 1 到 80 个字符。");
+  if (!["exact", "contains"].includes(input.matchType)) throw new Error("规则匹配方式不正确。");
+  if (!["expense", "income", "any"].includes(input.direction)) throw new Error("规则收支类型不正确。");
+  return { ...input, pattern, priority: Math.max(0, Math.min(1000, Math.trunc(input.priority ?? 0))), enabled: input.enabled ?? true };
+}
+
+async function getImportRules(bookId: string) {
+  return db.select().from(importCategoryRules).where(and(eq(importCategoryRules.bookId, bookId), eq(importCategoryRules.enabled, true))).orderBy(desc(importCategoryRules.priority), desc(importCategoryRules.updatedAt));
+}
+
+function ruleMatches(rule: typeof importCategoryRules.$inferSelect, row: ImportCandidate) {
+  if (rule.direction !== "any" && rule.direction !== row.direction) return false;
+  if (row.direction === "unknown") return false;
+  const pattern = normalizeRuleText(rule.pattern);
+  const text = normalizeRuleText(`${row.merchantName} ${row.productName ?? ""}`);
+  return rule.matchType === "exact" ? normalizeRuleText(row.merchantName) === pattern : text.includes(pattern);
+}
+
+async function suggestWithAi(rows: ImportCandidate[], bookCategories: { id: string; name: string; kind: string; parentId: string | null }[]) {
+  if (process.env.IMPORT_AI_ENABLED !== "true" || !process.env.AI_GATEWAY_API_KEY || !rows.length) return new Map<string, { categoryId: string; confidence: number; source: "ai" }>();
+  const maxMerchants = Math.max(1, Number(process.env.IMPORT_AI_MAX_UNIQUE_MERCHANTS ?? 60));
+  const unique = [...new Map(rows.map((row) => [`${row.direction}|${normalizeRuleText(row.merchantName)}|${normalizeRuleText(row.platformCategory)}`, row])).values()].slice(0, maxMerchants);
+  const categoriesForPrompt = bookCategories.filter((category) => category.kind === "income" ? !category.parentId : Boolean(category.parentId)).map((category, index) => [`c${index}`, category.name] as const);
+  const categoryMap = new Map<string, { id: string; name: string; kind: string; parentId: string | null }>(categoriesForPrompt.map(([shortId], index) => [shortId, bookCategories.filter((category) => category.kind === "income" ? !category.parentId : Boolean(category.parentId))[index]]));
+  if (!categoriesForPrompt.length) return new Map();
+  const input = unique.map((row, index) => ({ key: `m${index}`, direction: row.direction, merchant: clean(row.merchantName).slice(0, 60), description: clean(row.productName).slice(0, 80), platform: clean(row.platformCategory).slice(0, 30) }));
+  const model = process.env.IMPORT_AI_MODEL ?? "openai/gpt-4o-mini";
+  try {
+    const gateway = createGateway({ apiKey: process.env.AI_GATEWAY_API_KEY });
+    const result = await generateObject({
+      model: gateway.languageModel(model),
+      schema: z.object({ items: z.array(z.object({ key: z.string(), category: z.string().nullable(), confidence: z.number().min(0).max(1) })) }),
+      prompt: `只从候选分类中为账单商户选择最合适的分类。无法确定就返回 category=null。只输出结构化结果。候选分类:${JSON.stringify(categoriesForPrompt)}\n账单:${JSON.stringify(input)}`,
+      maxOutputTokens: Math.min(800, 80 + unique.length * 20),
+    });
+    const suggestions = new Map<string, { categoryId: string; confidence: number; source: "ai" }>();
+    for (const item of result.object.items) {
+      const category = item.category ? categoryMap.get(item.category) : null;
+      const row = unique[Number(item.key.slice(1))];
+      if (category && row && item.confidence >= 0.85) suggestions.set(`${row.direction}|${normalizeRuleText(row.merchantName)}|${normalizeRuleText(row.platformCategory)}`, { categoryId: category.id, confidence: item.confidence, source: "ai" });
+    }
+    return suggestions;
+  } catch (error) {
+    console.warn("[import-ai] classification unavailable", error instanceof Error ? error.message : error);
+    return new Map();
+  }
+}
+
+export async function listImportRules(userId: string) {
+  const bookId = await ensureDefaultLedger(userId);
+  return db.select({ id: importCategoryRules.id, pattern: importCategoryRules.pattern, matchType: importCategoryRules.matchType, direction: importCategoryRules.direction, categoryId: importCategoryRules.categoryId, categoryName: categories.name, priority: importCategoryRules.priority, enabled: importCategoryRules.enabled }).from(importCategoryRules).innerJoin(categories, eq(importCategoryRules.categoryId, categories.id)).where(eq(importCategoryRules.bookId, bookId)).orderBy(desc(importCategoryRules.priority), desc(importCategoryRules.updatedAt));
+}
+
+export async function createImportRule(userId: string, input: ImportRuleInput) {
+  const bookId = await ensureDefaultLedger(userId);
+  const value = validRuleInput(input);
+  const [category] = await db.select().from(categories).where(and(eq(categories.id, value.categoryId), eq(categories.bookId, bookId), isNull(categories.archivedAt))).limit(1);
+  if (!category || (value.direction !== "any" && category.kind !== value.direction) || (category.kind === "expense" && !category.parentId) || (category.kind === "income" && category.parentId)) throw new Error("规则分类无效。");
+  const [rule] = await db.insert(importCategoryRules).values({ bookId, pattern: value.pattern, matchType: value.matchType, direction: value.direction, categoryId: category.id, priority: value.priority, enabled: value.enabled }).returning();
+  return rule;
+}
+
+export async function updateImportRule(userId: string, id: string, input: ImportRuleInput) {
+  const bookId = await ensureDefaultLedger(userId);
+  const value = validRuleInput(input);
+  const [category] = await db.select().from(categories).where(and(eq(categories.id, value.categoryId), eq(categories.bookId, bookId), isNull(categories.archivedAt))).limit(1);
+  if (!category || (value.direction !== "any" && category.kind !== value.direction) || (category.kind === "expense" && !category.parentId) || (category.kind === "income" && category.parentId)) throw new Error("规则分类无效。");
+  const [rule] = await db.update(importCategoryRules).set({ pattern: value.pattern, matchType: value.matchType, direction: value.direction, categoryId: category.id, priority: value.priority, enabled: value.enabled, updatedAt: new Date() }).where(and(eq(importCategoryRules.id, id), eq(importCategoryRules.bookId, bookId))).returning();
+  return rule ?? null;
+}
+
+export async function deleteImportRule(userId: string, id: string) {
+  const bookId = await ensureDefaultLedger(userId);
+  const [rule] = await db.delete(importCategoryRules).where(and(eq(importCategoryRules.id, id), eq(importCategoryRules.bookId, bookId))).returning();
+  return rule ?? null;
 }
 
 export function sourceRowHash(source: ImportSource, row: Pick<ImportCandidate, "occurredAt" | "merchantName" | "amountCents" | "direction" | "note">) {
@@ -51,6 +148,23 @@ async function existingKeys(bookId: string, source: ImportSource, rows: ImportCa
 export async function checkImportRows(userId: string, source: ImportSource, rows: ImportCandidate[]) {
   const bookId = await ensureDefaultLedger(userId);
   const existing = await existingKeys(bookId, source, rows);
+  const [rules, bookCategories] = await Promise.all([
+    getImportRules(bookId),
+    db.select({ id: categories.id, name: categories.name, kind: categories.kind, parentId: categories.parentId }).from(categories).where(and(eq(categories.bookId, bookId), isNull(categories.archivedAt))),
+  ]);
+  const suggestions = new Map<string, { categoryId: string; source: "user_rule" | "ai"; confidence: number }>();
+  const unresolved: ImportCandidate[] = [];
+  for (const row of rows) {
+    const rule = rules.find((item) => ruleMatches(item, row));
+    if (rule) suggestions.set(row.clientKey, { categoryId: rule.categoryId, source: "user_rule", confidence: 1 });
+    else if (!row.categoryId) unresolved.push(row);
+  }
+  const aiSuggestions = await suggestWithAi(unresolved, bookCategories);
+  for (const row of unresolved) {
+    const key = `${row.direction}|${normalizeRuleText(row.merchantName)}|${normalizeRuleText(row.platformCategory)}`;
+    const suggestion = aiSuggestions.get(key);
+    if (suggestion) suggestions.set(row.clientKey, suggestion);
+  }
   const seenOrders = new Set<string>();
   const seenHashes = new Set<string>();
   return rows.map((row) => {
@@ -58,7 +172,8 @@ export async function checkImportRows(userId: string, source: ImportSource, rows
     const hash = sourceRowHash(source, row);
     const duplicate = orderId ? existing.orderIds.has(orderId) || seenOrders.has(orderId) : existing.hashes.has(hash) || seenHashes.has(hash);
     if (orderId) seenOrders.add(orderId); else seenHashes.add(hash);
-    return { clientKey: row.clientKey, duplicate };
+    const suggestion = suggestions.get(row.clientKey);
+    return { clientKey: row.clientKey, duplicate, categoryId: suggestion?.categoryId ?? null, categorySuggestion: suggestion?.source ?? null, categoryConfidence: suggestion?.confidence ?? null };
   });
 }
 

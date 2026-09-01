@@ -2185,10 +2185,11 @@ function ImportDialog({
       });
       const check = await fetch("/api/imports/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source: statement.source, rows: preview }) });
       if (!check.ok) throw new Error("账单重复预检失败，请稍后重试。");
-      const duplicateRows = (await check.json()) as { rows: { clientKey: string; duplicate: boolean }[] };
+      const duplicateRows = (await check.json()) as { rows: { clientKey: string; duplicate: boolean; categoryId?: string | null; categorySuggestion?: ImportPreviewRow["categorySuggestion"] }[] };
       const duplicates = new Map(duplicateRows.rows.map((row) => [row.clientKey, row.duplicate]));
+      const checkedSuggestions = new Map(duplicateRows.rows.map((row) => [row.clientKey, row]));
       setParsed(statement);
-      setRows(preview.map((row) => ({ ...row, duplicate: duplicates.get(row.clientKey) ?? false, enabled: row.enabled && !(duplicates.get(row.clientKey) ?? false) })));
+      setRows(preview.map((row) => { const checked = checkedSuggestions.get(row.clientKey); return { ...row, categoryId: checked?.categoryId ?? row.categoryId, categorySuggestion: checked?.categorySuggestion ?? row.categorySuggestion, duplicate: duplicates.get(row.clientKey) ?? false, enabled: row.enabled && !(duplicates.get(row.clientKey) ?? false) }; }));
       setStep("preview");
     } catch (cause) {
       setError(
@@ -2201,6 +2202,12 @@ function ImportDialog({
     }
   };
   const updateRow = (clientKey: string, patch: Partial<ImportPreviewRow>) => setRows((current) => current.map((row) => row.clientKey === clientKey ? { ...row, ...patch } : row));
+  const saveImportRule = async (row: ImportPreviewRow) => {
+    if (!row.categoryId || row.direction === "unknown" || !row.merchantName.trim()) return;
+    const response = await fetch("/api/import-rules", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pattern: row.merchantName, matchType: "contains", direction: row.direction, categoryId: row.categoryId, priority: 100 }) });
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    if (!response.ok) throw new Error(payload?.error ?? "保存分类规则失败。");
+  };
   const selectedRows = rows.filter((row) => row.enabled && !row.duplicate);
   const invalidRows = selectedRows.filter((row) => !row.categoryId || row.direction === "unknown" || !row.occurredAt || row.amountCents <= 0);
   const visibleRows = rows.filter((row) => filter === "all" ? true : filter === "duplicate" ? row.duplicate : filter === "issue" ? Boolean(row.error) || row.direction === "unknown" || (row.enabled && !row.categoryId) : row.enabled && !row.duplicate && row.direction !== "unknown" && Boolean(row.categoryId));
@@ -2320,7 +2327,7 @@ function ImportDialog({
             </div>
             <div className="mt-5 flex gap-2 overflow-x-auto pb-1">{([ ["all", "全部"], ["ready", "可导入"], ["issue", "待处理"], ["duplicate", "重复"] ] as const).map(([id, label]) => <button key={id} onClick={() => setFilter(id)} className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium ${filter === id ? "bg-[#0c6f78] text-white" : "bg-[#eff4f4] text-[#65717d]"}`}>{label}</button>)}</div>
             <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-              {visibleRows.map((row) => <ImportPreviewEditor key={row.clientKey} row={row} accounts={accounts} categories={categories} onChange={(patch) => updateRow(row.clientKey, patch)} />)}
+              {visibleRows.map((row) => <ImportPreviewEditor key={row.clientKey} row={row} accounts={accounts} categories={categories} onChange={(patch) => updateRow(row.clientKey, patch)} onSaveRule={() => saveImportRule(row)} />)}
               {!visibleRows.length && <p className="py-8 text-center text-sm text-[#8b94a3]">当前筛选下没有流水</p>}
             </div>
             {error && <p className="mt-3 rounded-xl bg-[#fff0ed] px-3 py-2 text-sm text-[#c54c2c]">{error}</p>}
