@@ -43,6 +43,8 @@ import {
   parseStatementFile,
   type ParsedStatement,
 } from "@/features/importers/parse-statement";
+import { ImportPreviewEditor, type ImportPreviewRow } from "@/features/importers/import-preview-editor";
+import { suggestImportCategory } from "@/features/importers/suggest-category";
 import {
   useLedger,
   type LedgerCategory,
@@ -596,6 +598,9 @@ export default function HomePage() {
         <ImportDialog
           step={importStep}
           setStep={setImportStep}
+          categories={ledger.categories}
+          accounts={ledger.accounts}
+          onImported={() => void ledger.refresh()}
           onClose={() => setImportOpen(false)}
         />
       )}
@@ -2147,23 +2152,43 @@ function CategoryAdminDialog({
 function ImportDialog({
   step,
   setStep,
+  categories,
+  accounts,
+  onImported,
   onClose,
 }: {
   step: "choose" | "preview" | "done";
   setStep: (s: "choose" | "preview" | "done") => void;
+  categories: LedgerCategory[];
+  accounts: { id: string; name: string; color: string }[];
+  onImported: () => void;
   onClose: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [parsed, setParsed] = useState<ParsedStatement | null>(null);
   const [error, setError] = useState("");
   const [parsing, setParsing] = useState(false);
+  const [rows, setRows] = useState<ImportPreviewRow[]>([]);
+  const [filter, setFilter] = useState<"all" | "ready" | "duplicate" | "issue">("all");
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState<{ imported: number; duplicates: number; skipped: number } | null>(null);
   const openFilePicker = () => inputRef.current?.click();
   const readFile = async (file?: File) => {
     if (!file) return;
     setError("");
     setParsing(true);
     try {
-      setParsed(await parseStatementFile(file));
+      const statement = await parseStatementFile(file);
+      const preview = statement.rows.map((row) => {
+        const suggestion = suggestImportCategory(row, categories);
+        return { ...row, clientKey: `${row.rowNumber}-${row.externalTransactionId ?? row.occurredAt}-${row.amountCents}`, categoryId: suggestion.categoryId, categorySuggestion: suggestion.source, accountId: null, note: "", enabled: row.direction !== "unknown", duplicate: false, error: row.direction === "unknown" ? "无法识别收支，请手动选择。" : null };
+      });
+      const check = await fetch("/api/imports/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source: statement.source, rows: preview }) });
+      if (!check.ok) throw new Error("账单重复预检失败，请稍后重试。");
+      const duplicateRows = (await check.json()) as { rows: { clientKey: string; duplicate: boolean }[] };
+      const duplicates = new Map(duplicateRows.rows.map((row) => [row.clientKey, row.duplicate]));
+      setParsed(statement);
+      setRows(preview.map((row) => ({ ...row, duplicate: duplicates.get(row.clientKey) ?? false, enabled: row.enabled && !(duplicates.get(row.clientKey) ?? false) })));
       setStep("preview");
     } catch (cause) {
       setError(
@@ -2175,7 +2200,24 @@ function ImportDialog({
       setParsing(false);
     }
   };
-  const previewRows = parsed?.rows.slice(0, 4) ?? [];
+  const updateRow = (clientKey: string, patch: Partial<ImportPreviewRow>) => setRows((current) => current.map((row) => row.clientKey === clientKey ? { ...row, ...patch } : row));
+  const selectedRows = rows.filter((row) => row.enabled && !row.duplicate);
+  const invalidRows = selectedRows.filter((row) => !row.categoryId || row.direction === "unknown" || !row.occurredAt || row.amountCents <= 0);
+  const visibleRows = rows.filter((row) => filter === "all" ? true : filter === "duplicate" ? row.duplicate : filter === "issue" ? Boolean(row.error) || row.direction === "unknown" || (row.enabled && !row.categoryId) : row.enabled && !row.duplicate && row.direction !== "unknown" && Boolean(row.categoryId));
+  const confirmImport = async () => {
+    if (!parsed || saving) return;
+    if (invalidRows.length) { setError(`还有 ${invalidRows.length} 笔已选记录未完成分类或收支确认。`); return; }
+    if (!selectedRows.length) { setError("请至少选择一笔有效流水。" ); return; }
+    setSaving(true); setError("");
+    try {
+      const response = await fetch("/api/imports/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source: parsed.source, filename: parsed.filename, rows }) });
+      const payload = (await response.json().catch(() => null)) as { imported?: number; duplicates?: number; skipped?: number; error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? "导入失败，请稍后重试。");
+      setResult({ imported: payload?.imported ?? 0, duplicates: payload?.duplicates ?? 0, skipped: payload?.skipped ?? 0 });
+      onImported(); setStep("done");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "导入失败，请稍后重试。"); }
+    finally { setSaving(false); }
+  };
   const sourceName =
     parsed?.source === "alipay"
       ? "支付宝"
@@ -2184,7 +2226,7 @@ function ImportDialog({
         : "通用账单";
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-[#102124]/35 p-4 backdrop-blur-sm">
-      <section className="w-full max-w-[620px] overflow-hidden rounded-[28px] bg-white shadow-2xl">
+      <section className={`w-full max-w-[620px] overflow-hidden rounded-[28px] bg-white shadow-2xl ${step === "preview" ? "flex h-[calc(100dvh-2rem)] max-h-[860px] flex-col" : ""}`}>
         <header className="flex items-center justify-between border-b border-[#ebeeee] px-6 py-5">
           <div>
             <p className="text-lg font-bold">导入账单</p>
@@ -2253,57 +2295,36 @@ function ImportDialog({
           </div>
         )}
         {step === "preview" && parsed && (
-          <div className="p-6">
+          <div className="flex min-h-0 flex-1 flex-col p-4 sm:p-6">
             <div className="rounded-2xl bg-[#eaf8f6] p-4">
               <p className="font-bold text-[#0c6f78]">
                 已识别：{sourceName}账单
               </p>
               <p className="mt-1 text-sm text-[#47716f]">
-                {parsed.filename} · 已解析 {parsed.rows.length} 条有效记录
+                {parsed.filename} · 已解析 {rows.length} 条有效记录
               </p>
               <div className="mt-3 flex gap-4 text-sm">
                 <span>
-                  <b>{parsed.rows.length}</b> 待导入
+                  <b>{selectedRows.length}</b> 已选
                 </span>
                 <span>
                   <b>{parsed.skipped}</b> 跳过空行/异常
                 </span>
                 <span>
                   <b>
-                    {
-                      parsed.rows.filter((row) => row.direction === "unknown")
-                        .length
-                    }
+                    {rows.filter((row) => row.duplicate).length}
                   </b>{" "}
-                  待确认
+                  重复
                 </span>
               </div>
             </div>
-            <div className="mt-5 divide-y divide-[#edf0f0]">
-              {previewRows.map((row) => (
-                <div
-                  className="flex items-center gap-3 py-3"
-                  key={row.rowNumber}
-                >
-                  <span className="grid size-9 place-items-center rounded-xl bg-[#e4f7f4] text-xs font-bold text-[#0c6f78]">
-                    {row.category.slice(0, 1)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
-                      {row.merchantName}
-                    </p>
-                    <p className="text-xs text-[#8b94a3]">
-                      {row.occurredAt || "日期待确认"} · {row.category}
-                    </p>
-                  </div>
-                  <b className="money text-sm">
-                    {row.direction === "income" ? "+" : "-"}¥
-                    {yuan(row.amountCents / 100)}
-                  </b>
-                </div>
-              ))}
+            <div className="mt-5 flex gap-2 overflow-x-auto pb-1">{([ ["all", "全部"], ["ready", "可导入"], ["issue", "待处理"], ["duplicate", "重复"] ] as const).map(([id, label]) => <button key={id} onClick={() => setFilter(id)} className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium ${filter === id ? "bg-[#0c6f78] text-white" : "bg-[#eff4f4] text-[#65717d]"}`}>{label}</button>)}</div>
+            <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+              {visibleRows.map((row) => <ImportPreviewEditor key={row.clientKey} row={row} accounts={accounts} categories={categories} onChange={(patch) => updateRow(row.clientKey, patch)} />)}
+              {!visibleRows.length && <p className="py-8 text-center text-sm text-[#8b94a3]">当前筛选下没有流水</p>}
             </div>
-            <div className="mt-5 flex gap-3">
+            {error && <p className="mt-3 rounded-xl bg-[#fff0ed] px-3 py-2 text-sm text-[#c54c2c]">{error}</p>}
+            <div className="mt-4 flex shrink-0 gap-3">
               <button
                 onClick={() => setStep("choose")}
                 className="flex-1 rounded-xl bg-[#f0f4f4] py-3 text-sm font-semibold"
@@ -2311,10 +2332,11 @@ function ImportDialog({
                 返回
               </button>
               <button
-                onClick={() => setStep("done")}
-                className="flex-[1.6] rounded-xl bg-[#0c6f78] py-3 text-sm font-bold text-white"
+                onClick={() => void confirmImport()}
+                disabled={saving}
+                className="flex-[1.6] rounded-xl bg-[#0c6f78] py-3 text-sm font-bold text-white disabled:opacity-60"
               >
-                确认导入 {parsed.rows.length} 笔
+                {saving ? "正在导入…" : `确认导入 ${selectedRows.length} 笔`}
               </button>
             </div>
           </div>
@@ -2326,9 +2348,9 @@ function ImportDialog({
             </span>
             <p className="mt-5 text-xl font-bold">账单已整理完成</p>
             <p className="mt-2 text-sm leading-6 text-[#7d8792]">
-              已完成本地解析与导入确认。
+              已写入你的私有云端账本。
               <br />
-              配置 Supabase 后，确认结果将写入你的私有云端账本。
+              成功导入 {result?.imported ?? 0} 笔，跳过重复 {result?.duplicates ?? 0} 笔。
             </p>
             <button
               onClick={onClose}

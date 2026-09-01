@@ -109,6 +109,7 @@ export const transactions = pgTable("transactions", {
 }, (table) => [
   index("transactions_book_occurred_idx").on(table.bookId, table.occurredAt),
   uniqueIndex("transactions_external_id_idx").on(table.bookId, table.source, table.externalTransactionId),
+  uniqueIndex("transactions_source_row_hash_idx").on(table.bookId, table.source, table.sourceRowHash),
   uniqueIndex("transactions_recurring_scheduled_idx").on(table.recurringEntryId, table.recurrenceScheduledFor),
 ]);
 
