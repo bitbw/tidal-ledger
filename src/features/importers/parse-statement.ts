@@ -16,11 +16,20 @@ export type ParsedStatementRow = {
   productName: string;
 };
 
+export type SkippedStatementRow = {
+  rowNumber: number;
+  occurredAt: string;
+  merchantName: string;
+  amount: string;
+  reason: string;
+};
+
 export type ParsedStatement = {
   source: StatementSource;
   filename: string;
   rows: ParsedStatementRow[];
   skipped: number;
+  skippedRows: SkippedStatementRow[];
   detectedHeaders: string[];
 };
 
@@ -83,8 +92,9 @@ function rowsToRecords(rows: unknown[][]) {
   return { headers, records, headerIndex };
 }
 
-function normalizeRecords(records: Record<string, unknown>[], headers: string[], headerIndex: number): ParsedStatementRow[] {
-  return records.map((record, index) => {
+function normalizeRecords(records: Record<string, unknown>[], headers: string[], headerIndex: number) {
+  const skippedRows: SkippedStatementRow[] = [];
+  const rows = records.map((record, index) => {
     const amount = readCell(record, aliases.amount);
     const directionLabel = readCell(record, aliases.direction);
     return {
@@ -98,7 +108,13 @@ function normalizeRecords(records: Record<string, unknown>[], headers: string[],
       platformCategory: readCell(record, aliases.platformCategory),
       productName: readCell(record, aliases.productName),
     };
-  }).filter((row) => row.amountCents > 0 && row.occurredAt);
+  }).filter((row) => {
+    if (row.amountCents > 0 && row.occurredAt) return true;
+    const record = records[row.rowNumber - headerIndex - 2];
+    skippedRows.push({ rowNumber: row.rowNumber, occurredAt: row.occurredAt, merchantName: row.merchantName, amount: readCell(record, aliases.amount), reason: row.amountCents <= 0 ? "金额为 0 或无效" : "缺少交易时间" });
+    return false;
+  });
+  return { rows, skippedRows };
 }
 
 function decodeCsv(bytes: Uint8Array) {
@@ -143,8 +159,9 @@ export async function parseStatementFile(file: File): Promise<ParsedStatement> {
   return {
     source: detectSource(headers),
     filename: file.name,
-    rows: normalized,
-    skipped: records.length - normalized.length,
+    rows: normalized.rows,
+    skipped: normalized.skippedRows.length,
+    skippedRows: normalized.skippedRows,
     detectedHeaders: headers,
   };
 }

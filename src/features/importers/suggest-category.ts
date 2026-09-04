@@ -18,7 +18,7 @@ export type CategorySuggestion = {
 };
 
 const expensePlatformRules: [string[], string[]][] = [
-  [["餐饮美食"], ["餐饮其他"]],
+  [["餐饮美食"], ["午餐"]],
   [["交通出行"], ["交通其他"]],
   [["日用百货"], ["家居百货"]],
   [["医疗健康"], ["医疗药品"]],
@@ -48,6 +48,12 @@ const incomeKeywordRules: [string[], string[]][] = [
   [["红包", "礼金"], ["礼金"]],
   [["退款", "赔付"], ["赔付款"]],
 ];
+
+export const defaultImportMappings = [
+  ...expensePlatformRules.map(([sources, targets]) => ({ type: "platform", direction: "expense", source: sources.join("、"), target: targets.join(" / ") })),
+  ...expenseKeywordRules.map(([sources, targets]) => ({ type: "keyword", direction: "expense", source: sources.join("、"), target: targets.join(" / ") })),
+  ...incomeKeywordRules.map(([sources, targets]) => ({ type: "keyword", direction: "income", source: sources.join("、"), target: targets.join(" / ") })),
+] as const;
 
 function normalized(value: string | undefined) {
   return (value ?? "").toLowerCase().replace(/\s+/g, "");

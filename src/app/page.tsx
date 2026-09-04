@@ -38,13 +38,13 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   parseStatementFile,
   type ParsedStatement,
 } from "@/features/importers/parse-statement";
 import { ImportPreviewEditor, type ImportPreviewRow } from "@/features/importers/import-preview-editor";
-import { suggestImportCategory } from "@/features/importers/suggest-category";
+import { defaultImportMappings, suggestImportCategory } from "@/features/importers/suggest-category";
 import {
   useLedger,
   type LedgerCategory,
@@ -226,6 +226,8 @@ export default function HomePage() {
   const [view, setView] = useState<View>("home");
   const [composerOpen, setComposerOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [categoryAdminOpen, setCategoryAdminOpen] = useState(false);
+  const [mappingOpen, setMappingOpen] = useState(false);
   const [importStep, setImportStep] = useState<"choose" | "preview" | "done">(
     "choose",
   );
@@ -520,6 +522,8 @@ export default function HomePage() {
               setImportStep("choose");
             }}
             onOpenRecurring={() => setView("plans")}
+            onOpenCategoryAdmin={() => setCategoryAdminOpen(true)}
+            onOpenMapping={() => setMappingOpen(true)}
             totals={ledger.totals}
             transactionCount={ledger.transactions.length}
             transactions={ledger.transactions}
@@ -594,6 +598,20 @@ export default function HomePage() {
           SelectedIcon={SelectedIcon}
         />
       )}
+      {categoryAdminOpen && (
+        <CategoryAdminDialog
+          startMode="manage"
+          initialKind="expense"
+          initialParentId={null}
+          categories={ledger.categories}
+          createCategory={ledger.createCategory}
+          updateCategory={ledger.updateCategory}
+          archiveCategory={ledger.archiveCategory}
+          onClose={() => setCategoryAdminOpen(false)}
+          onCreated={() => setCategoryAdminOpen(false)}
+        />
+      )}
+      {mappingOpen && <ImportMappingDialog categories={ledger.categories} onClose={() => setMappingOpen(false)} />}
       {importOpen && (
         <ImportDialog
           step={importStep}
@@ -623,6 +641,8 @@ function HomeView({
   transactionCount,
   transactions,
   onOpenRecurring,
+  onOpenCategoryAdmin,
+  onOpenMapping,
 }: {
   onCompose: () => void;
   onEdit: (transaction: LedgerTransaction) => void;
@@ -633,6 +653,8 @@ function HomeView({
   transactionCount: number;
   transactions: LedgerTransaction[];
   onOpenRecurring: () => void;
+  onOpenCategoryAdmin: () => void;
+  onOpenMapping: () => void;
 }) {
   const displayRecent = transactions.slice(0, 3).map((item) => ({
     transaction: item,
@@ -771,6 +793,8 @@ function HomeView({
           onClick={onImport}
         />
         <QuickAction icon={LayoutGrid} label="更多工具" color="#5579de" />
+        <QuickAction icon={Settings2} label="分类管理" color="#0c6f78" onClick={onOpenCategoryAdmin} />
+        <QuickAction icon={ArrowLeftRight} label="映射管理" color="#8366e8" onClick={onOpenMapping} />
       </section>
     </div>
   );
@@ -1593,7 +1617,7 @@ function PlansView({ recurring, categories, accounts }: { recurring: RecurringSt
   const [selected, setSelected] = useState<RecurringEntry | null>(null);
   const [detail, setDetail] = useState<(RecurringEntry & { generated: { id: string; occurredAt: string; amountCents: number; note: string | null }[] }) | null>(null);
   const [message, setMessage] = useState("");
-  const entries = tab === "active" ? recurring.active : recurring.ended;
+ const entries = tab === "active" ? recurring.active : recurring.ended;
   const openDetail = async (entry: RecurringEntry) => {
     try { setDetail(await recurring.get(entry.id)); }
     catch (error) { setMessage(error instanceof Error ? error.message : "读取详情失败"); }
@@ -2068,6 +2092,7 @@ function CategoryAdminDialog({
   const [managedParentId, setManagedParentId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [mappingOpen, setMappingOpen] = useState(false);
   const roots = categories.filter((category) => category.kind === "expense" && !category.parentId);
   const managedParent = roots.find((category) => category.id === managedParentId);
   const displayed = categories.filter((category) => category.kind === kind && (kind === "income" || (managedParentId ? category.parentId === managedParentId : !category.parentId)));
@@ -2098,7 +2123,7 @@ function CategoryAdminDialog({
   const iconColor = kind === "income" ? "#ff714b" : "#28c5b4";
   const iconSurface = kind === "income" ? "bg-[#fff0eb] text-[#ff714b]" : "bg-[#e4f7f4] text-[#28b9aa]";
   return (
-    <div className="absolute inset-0 z-20 flex items-end bg-black/40 md:items-center md:justify-center">
+    <div className="fixed inset-0 z-50 flex items-end bg-black/40 md:items-center md:justify-center">
       <section className="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-[28px] bg-[#f5f7f7] md:max-w-[600px] md:rounded-[28px]">
         <header className="flex items-center justify-between bg-white px-5 py-4">
           <button onClick={() => mode === "form" ? setMode("manage") : managedParentId ? setManagedParentId(null) : onClose()} className="grid size-9 place-items-center rounded-full bg-[#f2f5f5]"><ChevronLeft size={20} /></button>
@@ -2111,6 +2136,7 @@ function CategoryAdminDialog({
               {(["expense", "income"] as TransactionKind[]).map((item) => <button key={item} onClick={() => setKind(item)} className={`flex-1 rounded-lg py-2 text-sm font-bold ${kind === item ? item === "income" ? "bg-[#fff0eb] text-[#ff714b]" : "bg-[#e4f7f4] text-[#0c6f78]" : "text-[#7d8792]"}`}>{item === "expense" ? "支出" : "收入"}</button>)}
             </div>
             <button onClick={() => beginNew(kind, kind === "expense" ? managedParentId : null)} className="mb-3 w-full rounded-xl border border-dashed border-[#ffb09e] bg-white py-3 text-sm font-bold text-[#ff714b]">+ 新增{kind === "income" ? "收入分类" : managedParentId ? "小类" : "支出大类"}</button>
+            <button onClick={() => setMappingOpen(true)} className="mb-3 w-full rounded-xl border border-[#bce5df] bg-[#f3fbfa] py-3 text-sm font-bold text-[#0c6f78]">查看/设置导入映射</button>
             <div className="overflow-hidden rounded-2xl bg-white">
               {displayed.map((category) => {
                 const Icon = categoryIcon(category.icon);
@@ -2146,9 +2172,25 @@ function CategoryAdminDialog({
           </div>
         )}
       </section>
+      {mappingOpen && <ImportMappingDialog categories={categories} onClose={() => setMappingOpen(false)} />}
     </div>
   );
 }
+function ImportMappingDialog({ categories, onClose }: { categories: LedgerCategory[]; onClose: () => void }) {
+  const [rules, setRules] = useState<{ id: string; pattern: string; direction: "expense" | "income" | "any"; categoryId: string; categoryName: string }[]>([]);
+  const [pattern, setPattern] = useState("");
+  const [direction, setDirection] = useState<"expense" | "income">("expense");
+  const [categoryId, setCategoryId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const load = async () => { const response = await fetch("/api/import-rules"); const payload = (await response.json()) as typeof rules; if (response.ok) setRules(payload); else setMessage("读取用户映射失败"); setLoading(false); };
+  useEffect(() => { void load(); }, []);
+  const selectable = categories.filter((category) => category.kind === direction && (direction === "income" ? !category.parentId : Boolean(category.parentId)));
+  const add = async () => { if (!pattern.trim() || !categoryId) { setMessage("请输入商户关键词并选择分类"); return; } const response = await fetch("/api/import-rules", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pattern: pattern.trim(), matchType: "contains", direction, categoryId, priority: 100 }) }); const payload = await response.json(); if (!response.ok) { setMessage(payload.error ?? "保存失败"); return; } setRules((current) => [{ ...payload, categoryName: selectable.find((category) => category.id === categoryId)?.name ?? "" }, ...current]); setPattern(""); setCategoryId(""); setMessage("已保存"); };
+  const remove = async (id: string) => { if (!window.confirm("删除这条用户映射？")) return; const response = await fetch(`/api/import-rules/${id}`, { method: "DELETE" }); if (response.ok) setRules((current) => current.filter((rule) => rule.id !== id)); };
+  return <div className="fixed inset-0 z-[60] flex items-end bg-[#102124]/40 p-0 backdrop-blur-sm md:items-center md:justify-center md:p-4"><section className="max-h-[92dvh] w-full overflow-hidden rounded-t-3xl bg-[#f5f7f7] shadow-2xl md:max-w-[620px] md:rounded-3xl"><header className="flex items-center justify-between bg-white px-5 py-4"><div><p className="font-bold">导入分类映射</p><p className="mt-1 text-xs text-[#8b94a3]">默认映射只读，用户映射优先</p></div><button onClick={onClose} className="grid size-9 place-items-center rounded-full bg-[#f2f5f5]"><X size={18} /></button></header><div className="max-h-[calc(92dvh-72px)] space-y-4 overflow-y-auto p-5"><section className="rounded-2xl bg-white p-4"><p className="mb-3 font-bold">默认映射</p><div className="space-y-2">{defaultImportMappings.map((item, index) => <div key={`${item.type}-${item.source}-${index}`} className="flex items-center justify-between gap-3 rounded-xl bg-[#f5f7f7] px-3 py-2 text-sm"><span className="text-[#68737d]">{item.source}</span><span className="font-medium text-[#0c6f78]">→ {item.target}</span></div>)}</div></section><section className="rounded-2xl bg-white p-4"><p className="mb-3 font-bold">新增用户映射</p><div className="grid gap-2 sm:grid-cols-[1fr_auto_1fr]"><input value={pattern} onChange={(event) => setPattern(event.target.value)} placeholder="商户关键词，例如赵一鸣" className="rounded-xl bg-[#f3f6f6] px-3 py-3 text-sm outline-none" /><select value={direction} onChange={(event) => { setDirection(event.target.value as "expense" | "income"); setCategoryId(""); }} className="rounded-xl bg-[#f3f6f6] px-3 py-3 text-sm outline-none"><option value="expense">支出</option><option value="income">收入</option></select><select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} className="rounded-xl bg-[#f3f6f6] px-3 py-3 text-sm outline-none"><option value="">选择分类</option>{selectable.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></div><button onClick={() => void add()} className="mt-3 w-full rounded-xl bg-[#0c6f78] py-3 text-sm font-bold text-white">保存用户映射</button></section><section className="rounded-2xl bg-white p-4"><p className="mb-3 font-bold">我的映射</p>{loading ? <p className="text-sm text-[#8b94a3]">正在读取…</p> : rules.length ? <div className="space-y-2">{rules.map((rule) => <div key={rule.id} className="flex items-center justify-between gap-3 rounded-xl bg-[#f5f7f7] px-3 py-2 text-sm"><span className="min-w-0 truncate text-[#68737d]">{rule.pattern} · {rule.direction === "income" ? "收入" : "支出"}</span><span className="flex shrink-0 items-center gap-2"><b className="text-[#0c6f78]">→ {rule.categoryName}</b><button onClick={() => void remove(rule.id)} className="text-xs text-[#c54c2c]">删除</button></span></div>)}</div> : <p className="text-sm text-[#8b94a3]">还没有用户映射</p>}{message && <p className="mt-3 text-center text-sm text-[#c54c2c]">{message}</p>}</section></div></section></div>;
+}
+
 function ImportDialog({
   step,
   setStep,
@@ -2172,6 +2214,7 @@ function ImportDialog({
   const [filter, setFilter] = useState<"all" | "ready" | "duplicate" | "issue">("all");
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<{ imported: number; duplicates: number; skipped: number } | null>(null);
+  const [showSkipped, setShowSkipped] = useState(false);
   const openFilePicker = () => inputRef.current?.click();
   const readFile = async (file?: File) => {
     if (!file) return;
@@ -2314,9 +2357,9 @@ function ImportDialog({
                 <span>
                   <b>{selectedRows.length}</b> 已选
                 </span>
-                <span>
-                  <b>{parsed.skipped}</b> 跳过空行/异常
-                </span>
+                <button type="button" onClick={() => setShowSkipped(true)} disabled={!parsed.skippedRows.length} className="text-left disabled:opacity-50">
+                  <b>{parsed.skipped}</b> 无效记录
+                </button>
                 <span>
                   <b>
                     {rows.filter((row) => row.duplicate).length}
@@ -2346,6 +2389,19 @@ function ImportDialog({
                 {saving ? "正在导入…" : `确认导入 ${selectedRows.length} 笔`}
               </button>
             </div>
+          </div>
+        )}
+        {showSkipped && parsed && (
+          <div className="fixed inset-0 z-[60] grid place-items-center bg-[#102124]/40 p-4 backdrop-blur-sm">
+            <section className="max-h-[80dvh] w-full max-w-[560px] overflow-hidden rounded-3xl bg-white shadow-2xl">
+              <header className="flex items-center justify-between border-b border-[#ebeeee] px-5 py-4">
+                <div><p className="font-bold">无效记录</p><p className="mt-1 text-xs text-[#8b94a3]">这些记录未进入可编辑预览</p></div>
+                <button type="button" onClick={() => setShowSkipped(false)} className="grid size-9 place-items-center rounded-full bg-[#f3f6f6]"><X size={18} /></button>
+              </header>
+              <div className="max-h-[calc(80dvh-76px)] space-y-3 overflow-y-auto p-5">
+                {parsed.skippedRows.map((row) => <div key={row.rowNumber} className="rounded-2xl bg-[#f6f8f8] p-4 text-sm"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-bold text-[#303b44]">第 {row.rowNumber} 行 · {row.merchantName || "未识别商户"}</p><p className="mt-1 text-xs text-[#8b94a3]">{row.occurredAt || "缺少交易时间"}</p></div><b className="shrink-0 text-[#c54c2c]">¥{row.amount || "0.00"}</b></div><p className="mt-2 text-xs text-[#c54c2c]">原因：{row.reason}</p></div>)}
+              </div>
+            </section>
           </div>
         )}
         {step === "done" && (

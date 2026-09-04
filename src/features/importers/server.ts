@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { createGateway } from "@ai-sdk/gateway";
-import { generateObject } from "ai";
-import { z } from "zod";
+import { generateText } from "ai";
 import { db } from "@/lib/db/client";
 import { ensureDefaultLedger } from "@/features/ledger/server";
 import { accounts, categories, importBatches, importCategoryRules, importRows, transactions } from "@/features/ledger/schema";
+import { suggestImportCategory } from "@/features/importers/suggest-category";
 
 export type ImportSource = "wechat" | "alipay" | "generic";
 export type ImportDirection = "income" | "expense" | "unknown";
@@ -67,27 +67,54 @@ async function suggestWithAi(rows: ImportCandidate[], bookCategories: { id: stri
   if (process.env.IMPORT_AI_ENABLED !== "true" || !process.env.AI_GATEWAY_API_KEY || !rows.length) return new Map<string, { categoryId: string; confidence: number; source: "ai" }>();
   const maxMerchants = Math.max(1, Number(process.env.IMPORT_AI_MAX_UNIQUE_MERCHANTS ?? 60));
   const unique = [...new Map(rows.map((row) => [`${row.direction}|${normalizeRuleText(row.merchantName)}|${normalizeRuleText(row.platformCategory)}`, row])).values()].slice(0, maxMerchants);
-  const categoriesForPrompt = bookCategories.filter((category) => category.kind === "income" ? !category.parentId : Boolean(category.parentId)).map((category, index) => [`c${index}`, category.name] as const);
-  const categoryMap = new Map<string, { id: string; name: string; kind: string; parentId: string | null }>(categoriesForPrompt.map(([shortId], index) => [shortId, bookCategories.filter((category) => category.kind === "income" ? !category.parentId : Boolean(category.parentId))[index]]));
+  const selectableCategories = bookCategories.filter((category) => category.kind === "income" ? !category.parentId : Boolean(category.parentId));
+  const categoriesForPrompt = selectableCategories.map((category, index) => [`c${index}`, category.name] as const);
+  const categoryMap = new Map<string, { id: string; name: string; kind: string; parentId: string | null }>(categoriesForPrompt.map(([shortId], index) => [shortId, selectableCategories[index]]));
   if (!categoriesForPrompt.length) return new Map();
   const input = unique.map((row, index) => ({ key: `m${index}`, direction: row.direction, merchant: clean(row.merchantName).slice(0, 60), description: clean(row.productName).slice(0, 80), platform: clean(row.platformCategory).slice(0, 30) }));
   const model = process.env.IMPORT_AI_MODEL ?? "openai/gpt-4o-mini";
+  const logAi = process.env.IMPORT_AI_LOG === "true";
   try {
     const gateway = createGateway({ apiKey: process.env.AI_GATEWAY_API_KEY });
-    const result = await generateObject({
+    const prompt = `为每条账单选择最合适的候选分类。只能使用候选分类 ID；无法确定时 category=null。\n只返回一个紧凑 JSON 对象，不要 Markdown、解释或额外文字，格式必须是：{"items":[{"key":"m0","category":"c0","confidence":0.92}]}。confidence 是 0 到 1 的数字。\n候选分类:${JSON.stringify(categoriesForPrompt)}\n账单:${JSON.stringify(input)}`;
+    if (logAi) console.info("[import-ai] request", { model, merchants: input });
+    const result = await generateText({
       model: gateway.languageModel(model),
-      schema: z.object({ items: z.array(z.object({ key: z.string(), category: z.string().nullable(), confidence: z.number().min(0).max(1) })) }),
-      prompt: `只从候选分类中为账单商户选择最合适的分类。无法确定就返回 category=null。只输出结构化结果。候选分类:${JSON.stringify(categoriesForPrompt)}\n账单:${JSON.stringify(input)}`,
-      maxOutputTokens: Math.min(800, 80 + unique.length * 20),
+      prompt,
+      maxOutputTokens: Math.min(2000, 400 + unique.length * 80),
+      temperature: 0,
     });
+    const rawText = result.text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+    const parsed: unknown = JSON.parse(rawText);
+    if (!parsed || typeof parsed !== "object" || !Array.isArray((parsed as { items?: unknown }).items)) throw new Error("AI 返回的 JSON 格式不正确");
+    const items = (parsed as { items: unknown[] }).items.filter((item): item is { key: string; category: string | null; confidence: number } => {
+      if (!item || typeof item !== "object") return false;
+      const value = item as Record<string, unknown>;
+      return typeof value.key === "string" && (typeof value.category === "string" || value.category === null) && typeof value.confidence === "number" && value.confidence >= 0 && value.confidence <= 1;
+    });
+    if (logAi) {
+      console.info("[import-ai] response", { finishReason: result.finishReason, text: rawText, itemCount: items.length });
+    }
     const suggestions = new Map<string, { categoryId: string; confidence: number; source: "ai" }>();
-    for (const item of result.object.items) {
+    for (const item of items) {
       const category = item.category ? categoryMap.get(item.category) : null;
-      const row = unique[Number(item.key.slice(1))];
+      const rowIndex = /^m\d+$/.test(item.key) ? Number(item.key.slice(1)) : -1;
+      const row = unique[rowIndex];
+      if (logAi) {
+        console.info("[import-ai] mapping", {
+          key: item.key,
+          merchant: row?.merchantName ?? null,
+          returnedCategory: item.category,
+          mappedCategory: category?.name ?? null,
+          confidence: item.confidence,
+          accepted: Boolean(category && row && item.confidence >= 0.85),
+        });
+      }
       if (category && row && item.confidence >= 0.85) suggestions.set(`${row.direction}|${normalizeRuleText(row.merchantName)}|${normalizeRuleText(row.platformCategory)}`, { categoryId: category.id, confidence: item.confidence, source: "ai" });
     }
     return suggestions;
   } catch (error) {
+    if (logAi) console.warn("[import-ai] error", error instanceof Error ? error.message : error);
     console.warn("[import-ai] classification unavailable", error instanceof Error ? error.message : error);
     return new Map();
   }
@@ -154,10 +181,15 @@ export async function checkImportRows(userId: string, source: ImportSource, rows
   ]);
   const suggestions = new Map<string, { categoryId: string; source: "user_rule" | "ai"; confidence: number }>();
   const unresolved: ImportCandidate[] = [];
+  const localCategories = bookCategories.filter((category): category is typeof category & { kind: "expense" | "income" } => category.kind === "expense" || category.kind === "income");
   for (const row of rows) {
     const rule = rules.find((item) => ruleMatches(item, row));
     if (rule) suggestions.set(row.clientKey, { categoryId: rule.categoryId, source: "user_rule", confidence: 1 });
-    else if (!row.categoryId) unresolved.push(row);
+    else {
+      const local = suggestImportCategory(row, localCategories);
+      if (local.categoryId) suggestions.set(row.clientKey, { categoryId: local.categoryId, source: local.source === "platform" || local.source === "keyword" ? "user_rule" : "ai", confidence: 1 });
+      else if (!row.categoryId) unresolved.push(row);
+    }
   }
   const aiSuggestions = await suggestWithAi(unresolved, bookCategories);
   for (const row of unresolved) {
