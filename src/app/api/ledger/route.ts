@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 import {
   createLedgerTransaction,
+  deleteLedgerTransaction,
   ensureDefaultLedger,
   getLedger,
   updateLedgerTransaction,
@@ -90,5 +91,15 @@ export async function PATCH(request: Request) {
       { error: "Transaction not found" },
       { status: 404 },
     );
+  return NextResponse.json(transaction);
+}
+
+export async function DELETE(request: Request) {
+  const user = await sessionUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const body = (await request.json()) as { id?: string };
+  if (!body.id) return NextResponse.json({ error: "Invalid transaction" }, { status: 400 });
+  const transaction = await deleteLedgerTransaction(user.id, body.id);
+  if (!transaction) return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
   return NextResponse.json(transaction);
 }

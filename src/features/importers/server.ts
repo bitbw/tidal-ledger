@@ -157,6 +157,11 @@ function validSource(source: string): source is ImportSource {
   return source === "wechat" || source === "alipay" || source === "generic";
 }
 
+function importNote(row: ImportCandidate) {
+  const direction = row.direction === "income" ? "收入" : row.direction === "expense" ? "支出" : "待确认";
+  return [clean(row.merchantName), clean(row.productName), direction, clean(row.note)].filter(Boolean).join(" · ");
+}
+
 function validateDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
@@ -249,7 +254,7 @@ export async function confirmImport(userId: string, input: { source: ImportSourc
         else {
           const [transaction] = await tx.insert(transactions).values({
             bookId, accountId: row.accountId ?? null, categoryId: category.id, transactionType: row.direction,
-            amountCents: row.amountCents, occurredAt, merchantName: clean(row.merchantName), note: clean(row.note) || null,
+            amountCents: row.amountCents, occurredAt, merchantName: clean(row.merchantName), note: importNote(row) || null,
             source: input.source, externalTransactionId: orderId, sourceRowHash: hash, importBatchId: batch.id, createdBy: userId,
           }).onConflictDoNothing().returning();
           if (transaction) { decision = "imported"; transactionId = transaction.id; imported += 1; }

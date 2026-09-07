@@ -338,3 +338,13 @@ export async function updateLedgerTransaction(
     .returning();
   return transaction ?? null;
 }
+
+export async function deleteLedgerTransaction(userId: string, transactionId: string) {
+  const bookId = await ensureDefaultLedger(userId);
+  const [transaction] = await db
+    .update(transactions)
+    .set({ deletedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(transactions.id, transactionId), eq(transactions.bookId, bookId), isNull(transactions.deletedAt)))
+    .returning({ id: transactions.id });
+  return transaction ?? null;
+}

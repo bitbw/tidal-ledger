@@ -541,6 +541,7 @@ export default function HomePage() {
             selectedDate={transactionDateFilter}
             onClearDate={() => setTransactionDateFilter(null)}
             onEdit={openTransactionEditor}
+            onDelete={ledger.deleteTransaction}
             onBack={() => {
               setTransactionDateFilter(null);
               setView("home");
@@ -975,14 +976,18 @@ function TransactionsView({
   selectedDate,
   onClearDate,
   onEdit,
+  onDelete,
   onBack,
 }: {
   transactions: LedgerTransaction[];
   selectedDate: string | null;
   onClearDate: () => void;
   onEdit: (transaction: LedgerTransaction) => void;
+  onDelete: (id: string) => Promise<void>;
   onBack: () => void;
 }) {
+  const [swipedId, setSwipedId] = useState<string | null>(null);
+  const touchStartX = useRef(0);
   const visibleTransactions = selectedDate
     ? transactions.filter(
         (transaction) =>
@@ -1054,11 +1059,24 @@ function TransactionsView({
                     ? "#5579de"
                     : "#28c5b4";
                 return (
-                  <button
-                    onClick={() => onEdit(item)}
-                    className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-[#f7fbfb]"
-                    key={item.id}
-                  >
+                  <div className="relative overflow-hidden" key={item.id}>
+                    <button
+                      type="button"
+                      aria-label={`删除${item.categoryName || item.merchantName || "这笔流水"}`}
+                      onClick={async () => {
+                        if (!window.confirm("确认删除这笔流水吗？")) return;
+                        try { await onDelete(item.id); setSwipedId(null); } catch (error) { window.alert(error instanceof Error ? error.message : "删除失败"); }
+                      }}
+                      className="absolute inset-y-0 right-0 w-20 bg-[#e94949] text-sm font-bold text-white"
+                    >删除</button>
+                    <button
+                      type="button"
+                      onClick={() => { if (swipedId) { setSwipedId(null); return; } onEdit(item); }}
+                      onTouchStart={(event) => { touchStartX.current = event.changedTouches[0]?.clientX ?? 0; }}
+                      onTouchEnd={(event) => { const delta = (event.changedTouches[0]?.clientX ?? 0) - touchStartX.current; if (delta < -48) setSwipedId(item.id); else if (delta > 48) setSwipedId(null); }}
+                      style={{ transform: swipedId === item.id ? "translateX(-80px)" : "translateX(0)" }}
+                      className="relative flex w-full items-center gap-3 bg-white px-5 py-4 text-left transition-transform duration-200 hover:bg-[#f7fbfb]"
+                    >
                     <span
                       className="grid size-10 place-items-center rounded-2xl"
                       style={{ background: `${color}1a`, color }}
@@ -1091,6 +1109,7 @@ function TransactionsView({
                       {isIncome ? "+" : "-"}¥{yuan(item.amountCents / 100)}
                     </b>
                   </button>
+                  </div>
                 );
               })}
             </div>
@@ -2215,6 +2234,7 @@ function ImportDialog({
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<{ imported: number; duplicates: number; skipped: number } | null>(null);
   const [showSkipped, setShowSkipped] = useState(false);
+  const [showMapping, setShowMapping] = useState(false);
   const openFilePicker = () => inputRef.current?.click();
   const readFile = async (file?: File) => {
     if (!file) return;

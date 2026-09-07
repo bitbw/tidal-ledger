@@ -153,17 +153,51 @@ function CategoryCard({ title, color, type, level, items, scopeTitleText, startA
 }
 
 function Donut({ items, type, color, onPick }: { items: CategoryReportItem[]; type: "income" | "expense"; color: string; onPick: (item: CategoryReportItem) => void }) {
-  const data = items.map((item, index) => ({ name: item.name, value: item.amountCents, item, itemStyle: { color: visualColor(item, index, type) } }));
   const total = items.reduce((sum, item) => sum + item.amountCents, 0);
+  const chartItems = items.length > 10
+    ? [...items.slice(0, 10), {
+        id: null,
+        name: "其他",
+        amountCents: items.slice(10).reduce((sum, item) => sum + item.amountCents, 0),
+        percentage: items.slice(10).reduce((sum, item) => sum + item.percentage, 0),
+        transactionCount: items.slice(10).reduce((sum, item) => sum + item.transactionCount, 0),
+        icon: null,
+        color: "#b9c4c5",
+      }]
+    : items;
+  const data = chartItems.map((item, index) => ({
+    name: item.name,
+    value: item.amountCents,
+    item,
+    itemStyle: { color: item.name === "其他" ? "#b9c4c5" : visualColor(item, index, type) },
+  }));
   const option = {
     animationDuration: 350,
     tooltip: { trigger: "item", confine: true, backgroundColor: "#f3f6f6", borderColor: "transparent", borderWidth: 0, borderRadius: 9, padding: [9, 13], shadowBlur: 18, shadowColor: "rgba(35, 57, 62, 0.12)", textStyle: { color: "#20252b", fontSize: 12 }, formatter: (params: { name: string; value: number; percent: number }) => `<strong>${params.name}</strong><br/>¥${money(params.value)} · ${params.percent.toFixed(2)}%` },
-    series: [{ type: "pie", radius: ["42%", "68%"], center: ["50%", "50%"], avoidLabelOverlap: false, minAngle: 1, itemStyle: { borderColor: "#fff", borderWidth: 2 }, label: { show: true, color: "#63707c", fontSize: 10, formatter: (params: { name: string; percent: number }) => `${params.name} ${params.percent.toFixed(2)}%`, lineHeight: 14, overflow: "break" }, labelLine: { show: true, length: 14, length2: 18, smooth: false, lineStyle: { width: 1 } }, labelLayout: { hideOverlap: false, moveOverlap: "shiftY", draggable: false }, emphasis: { scale: true, scaleSize: 4, label: { show: true, fontWeight: 700 } }, data }],
+    series: [{
+      type: "pie",
+      radius: ["32%", "54%"],
+      center: ["50%", "50%"],
+      avoidLabelOverlap: true,
+      minAngle: 2,
+      itemStyle: { borderColor: "#fff", borderWidth: 2 },
+      label: {
+        show: true,
+        position: "outside",
+        color: "#63707c",
+        fontSize: 10,
+        lineHeight: 14,
+        formatter: (params: { name: string; percent: number }) => `${params.name} ${params.percent.toFixed(2)}%`,
+      },
+      labelLine: { show: true, length: 12, length2: 22, smooth: false, lineStyle: { width: 1, color: "#9aa8ac" } },
+      labelLayout: { hideOverlap: false, moveOverlap: "shiftY", draggable: false, bleedMargin: 6 },
+      emphasis: { scale: true, scaleSize: 4, label: { show: true, fontWeight: 700 } },
+      data,
+    }],
     graphic: [{ type: "text", left: "center", top: "42%", style: { text: `总${type === "income" ? "收入" : "支出"}`, fill: "#8a96a0", fontSize: 12, textAlign: "center" } }, { type: "text", left: "center", top: "51%", style: { text: `¥${money(total)}`, fill: "#20252b", fontSize: 18, fontWeight: 700, textAlign: "center" } }],
   };
-  return <ReactECharts option={option} style={{ height: Math.max(320, Math.min(440, 280 + items.length * 7)), width: "100%" }} opts={{ renderer: "canvas" }} onEvents={{ click: (params: { dataIndex: number }) => { const item = items[params.dataIndex]; if (item) onPick(item); } }} />;
+  return <ReactECharts option={option} style={{ height: Math.max(280, Math.min(360, 245 + chartItems.length * 4)), width: "100%" }} opts={{ renderer: "canvas" }} onEvents={{ click: (params: { dataIndex: number }) => { const item = chartItems[params.dataIndex]; if (item?.id) onPick(item); } }} />;
 }
-
 function FlowCard({ level, expense, income, scopeTitleText, startAt, endAt, onDetail }: { level: "major" | "minor"; expense: CategoryReportItem[]; income: CategoryReportItem[]; scopeTitleText: string; startAt: string; endAt: string; onDetail: (filter: ReportDetailFilter) => void }) {
   const incomeRows = income.slice(0, 8); const expenseRows = expense.slice(0, 8); const open = (item: CategoryReportItem, type: "income" | "expense") => onDetail(categoryFilter(scopeTitleText, startAt, endAt, type, level, item));
   const incomeTotal = income.reduce((sum, item) => sum + item.amountCents, 0); const expenseTotal = expense.reduce((sum, item) => sum + item.amountCents, 0);
