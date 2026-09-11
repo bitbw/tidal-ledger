@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "transactions_source_row_hash_idx" ON "transactions" USING btree ("book_id","source","source_row_hash");

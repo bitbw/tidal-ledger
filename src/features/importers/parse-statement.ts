@@ -12,6 +12,16 @@ export type ParsedStatementRow = {
   direction: "expense" | "income" | "unknown";
   externalTransactionId: string | null;
   category: string;
+  platformCategory: string;
+  productName: string;
+};
+
+export type SkippedStatementRow = {
+  rowNumber: number;
+  occurredAt: string;
+  merchantName: string;
+  amount: string;
+  reason: string;
 };
 
 export type ParsedStatement = {
@@ -19,15 +29,18 @@ export type ParsedStatement = {
   filename: string;
   rows: ParsedStatementRow[];
   skipped: number;
+  skippedRows: SkippedStatementRow[];
   detectedHeaders: string[];
 };
 
 const aliases = {
-  occurredAt: ["交易时间", "交易创建时间", "交易日期", "时间", "日期"],
-  merchantName: ["商户名称", "交易对方", "商品", "商品名称", "对方", "交易描述"],
+  occurredAt: ["交易时间", "交易创建时间", "交易日期", "时间", "日期", "交易创建时间(北京时间)"],
+  merchantName: ["商户名称", "交易对方", "商品", "商品名称", "对方", "交易描述", "对方账户", "交易对方名称"],
   amount: ["金额(元)", "金额", "交易金额", "收/支金额", "金额（元）"],
-  direction: ["收/支", "收支", "收/付款方式", "交易类型", "资金状态"],
-  externalTransactionId: ["交易单号", "交易订单号", "商户订单号", "流水号"],
+  direction: ["收/支", "收支", "收/付款方式", "交易类型", "资金状态", "收支类型"],
+  platformCategory: ["交易分类", "商品类型", "交易类型", "消费分类"],
+  productName: ["商品说明", "商品", "商品名称", "交易描述", "备注"],
+  externalTransactionId: ["交易单号", "交易订单号", "商户订单号", "流水号", "微信支付订单号", "支付宝交易号"],
 };
 
 function normalizeHeader(value: unknown) {
@@ -79,8 +92,9 @@ function rowsToRecords(rows: unknown[][]) {
   return { headers, records, headerIndex };
 }
 
-function normalizeRecords(records: Record<string, unknown>[], headers: string[], headerIndex: number): ParsedStatementRow[] {
-  return records.map((record, index) => {
+function normalizeRecords(records: Record<string, unknown>[], headers: string[], headerIndex: number) {
+  const skippedRows: SkippedStatementRow[] = [];
+  const rows = records.map((record, index) => {
     const amount = readCell(record, aliases.amount);
     const directionLabel = readCell(record, aliases.direction);
     return {
@@ -90,9 +104,17 @@ function normalizeRecords(records: Record<string, unknown>[], headers: string[],
       amountCents: parseAmount(amount),
       direction: classifyDirection(directionLabel, amount),
       externalTransactionId: readCell(record, aliases.externalTransactionId) || null,
-      category: "待分类",
+      category: readCell(record, aliases.platformCategory) || "待分类",
+      platformCategory: readCell(record, aliases.platformCategory),
+      productName: readCell(record, aliases.productName),
     };
-  }).filter((row) => row.amountCents > 0 && row.occurredAt);
+  }).filter((row) => {
+    if (row.amountCents > 0 && row.occurredAt) return true;
+    const record = records[row.rowNumber - headerIndex - 2];
+    skippedRows.push({ rowNumber: row.rowNumber, occurredAt: row.occurredAt, merchantName: row.merchantName, amount: readCell(record, aliases.amount), reason: row.amountCents <= 0 ? "金额为 0 或无效" : "缺少交易时间" });
+    return false;
+  });
+  return { rows, skippedRows };
 }
 
 function decodeCsv(bytes: Uint8Array) {
@@ -106,7 +128,9 @@ function decodeCsv(bytes: Uint8Array) {
 }
 
 function parseCsv(bytes: Uint8Array) {
-  const parsed = Papa.parse<string[]>(decodeCsv(bytes), { skipEmptyLines: true });
+  // Alipay exports use CRLF in the preamble but LF for transaction rows.
+  const text = decodeCsv(bytes).replace(/\r\n?/g, "\n");
+  const parsed = Papa.parse<string[]>(text, { skipEmptyLines: true, newline: "\n" });
   return parsed.data as unknown[][];
 }
 
@@ -135,8 +159,9 @@ export async function parseStatementFile(file: File): Promise<ParsedStatement> {
   return {
     source: detectSource(headers),
     filename: file.name,
-    rows: normalized,
-    skipped: records.length - normalized.length,
+    rows: normalized.rows,
+    skipped: normalized.skippedRows.length,
+    skippedRows: normalized.skippedRows,
     detectedHeaders: headers,
   };
 }

@@ -55,6 +55,14 @@ export function useLedger(enabled: boolean) {
       void refresh();
     });
   }, [refresh]);
+  const deleteTransaction = useCallback(async (id: string) => {
+    const result = await fetch("/api/ledger", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    if (!result.ok) {
+      const body = (await result.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? "删除流水失败。");
+    }
+    await refresh();
+  }, [refresh]);
   const addTransaction = useCallback(
     async (input: {
       transactionType: "expense" | "income";
@@ -158,6 +166,7 @@ export function useLedger(enabled: boolean) {
     error,
     refresh,
     addTransaction,
+    deleteTransaction,
     updateTransaction,
     createCategory,
     updateCategory,

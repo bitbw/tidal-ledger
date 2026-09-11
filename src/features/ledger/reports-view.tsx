@@ -149,21 +149,55 @@ function visualColor(item: CategoryReportItem, index: number, type: "income" | "
 function CategoryCard({ title, color, type, level, items, scopeTitleText, startAt, endAt, onDetail }: { title: string; color: string; type: "income" | "expense"; level: "major" | "minor"; items: CategoryReportItem[]; scopeTitleText: string; startAt: string; endAt: string; onDetail: (filter: ReportDetailFilter) => void }) {
   const [expanded, setExpanded] = useState(false); const visible = expanded ? items : items.slice(0, 3); const total = items.reduce((sum, item) => sum + item.amountCents, 0);
   const open = (item: CategoryReportItem) => onDetail(categoryFilter(scopeTitleText, startAt, endAt, type, level, item));
-  return <section className="card soft-shadow p-5"><div className="mb-2 flex items-start justify-between"><div><h2 className="text-lg font-bold">{title}</h2><p className="mt-1 text-sm text-[#8b94a3]">点击图表或分类查看流水</p></div><span className="money text-lg font-bold" style={{ color }}>¥{money(total)}</span></div>{items.length ? <><Donut items={items} type={type} color={color} onPick={open} /><div className="divide-y divide-[#edf0f0]">{visible.map((item, index) => { const segmentColor = visualColor(item, index, type); return <button key={item.id} onClick={() => open(item)} className="flex w-full items-center gap-3 py-3 text-left hover:bg-[#f8fbfb]"><span className="grid size-10 place-items-center rounded-full text-sm font-bold" style={{ background: `${color}18`, color }}>{iconText(item)}</span><span className="min-w-0 flex-1"><b className="block truncate text-sm">{item.name}</b><small className="text-[#929ba4]">{item.transactionCount} 笔</small><span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-[#edf2f2]"><span className="block h-full rounded-full" style={{ width: `${Math.max(item.percentage, 2)}%`, background: segmentColor }} /></span></span><span className="text-right"><b className="money block">¥{money(item.amountCents)}</b><small className="text-[#929ba4]">{item.percentage.toFixed(2)}%</small></span></button>; })}</div>{items.length > 3 && <button onClick={() => setExpanded((value) => !value)} className="mt-2 w-full rounded-xl py-2 text-sm font-medium text-[#16766b] hover:bg-[#f1f8f7]">{expanded ? "收起" : `点击展开 ${items.length} 个分类`}</button>}</> : <p className="rounded-xl bg-[#f5f7f7] py-10 text-center text-sm text-[#98a1aa]">暂无对应分类流水</p>}</section>;
+ return <section className="card soft-shadow p-5"><div className="mb-2 flex items-start justify-between"><div><h2 className="text-lg font-bold">{title}</h2><p className="mt-1 text-sm text-[#8b94a3]">点击图表或分类查看流水</p></div><span className="money text-lg font-bold" style={{ color }}>¥{money(total)}</span></div>{items.length ? <><Donut items={items} type={type} color={color} onPick={open} /><div className="divide-y divide-[#edf0f0]">{visible.map((item, index) => { const segmentColor = visualColor(item, index, type); return <button key={item.id} onClick={() => open(item)} className="flex w-full items-center gap-3 py-3 text-left hover:bg-[#f8fbfb]"><span className="grid size-10 place-items-center rounded-full text-sm font-bold" style={{ background: `${color}18`, color }}>{iconText(item)}</span><span className="min-w-0 flex-1"><b className="block truncate text-sm">{item.name}</b><small className="text-[#929ba4]">{item.transactionCount} 笔</small><span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-[#edf2f2]"><span className="block h-full rounded-full" style={{ width: `${Math.max(item.percentage, 2)}%`, background: segmentColor }} /></span></span><span className="text-right"><b className="money block">¥{money(item.amountCents)}</b><small className="text-[#929ba4]">{Math.round(item.percentage)}%</small></span></button>; })}</div>{items.length > 3 && <button onClick={() => setExpanded((value) => !value)} className="mt-2 w-full rounded-xl py-2 text-sm font-medium text-[#16766b] hover:bg-[#f1f8f7]">{expanded ? "收起" : `点击展开 ${items.length} 个分类`}</button>}</> : <p className="rounded-xl bg-[#f5f7f7] py-10 text-center text-sm text-[#98a1aa]">暂无对应分类流水</p>}</section>;
 }
 
 function Donut({ items, type, color, onPick }: { items: CategoryReportItem[]; type: "income" | "expense"; color: string; onPick: (item: CategoryReportItem) => void }) {
-  const data = items.map((item, index) => ({ name: item.name, value: item.amountCents, item, itemStyle: { color: visualColor(item, index, type) } }));
   const total = items.reduce((sum, item) => sum + item.amountCents, 0);
+  const chartItems = items.length > 10
+    ? [...items.slice(0, 10), {
+        id: null,
+        name: "其他",
+        amountCents: items.slice(10).reduce((sum, item) => sum + item.amountCents, 0),
+        percentage: items.slice(10).reduce((sum, item) => sum + item.percentage, 0),
+        transactionCount: items.slice(10).reduce((sum, item) => sum + item.transactionCount, 0),
+        icon: null,
+        color: "#b9c4c5",
+      }]
+    : items;
+  const data = chartItems.map((item, index) => ({
+    name: item.name,
+    value: item.amountCents,
+    item,
+    itemStyle: { color: item.name === "其他" ? "#b9c4c5" : visualColor(item, index, type) },
+  }));
   const option = {
     animationDuration: 350,
-    tooltip: { trigger: "item", confine: true, backgroundColor: "#f3f6f6", borderColor: "transparent", borderWidth: 0, borderRadius: 9, padding: [9, 13], shadowBlur: 18, shadowColor: "rgba(35, 57, 62, 0.12)", textStyle: { color: "#20252b", fontSize: 12 }, formatter: (params: { name: string; value: number; percent: number }) => `<strong>${params.name}</strong><br/>¥${money(params.value)} · ${params.percent.toFixed(2)}%` },
-    series: [{ type: "pie", radius: ["42%", "68%"], center: ["50%", "50%"], avoidLabelOverlap: false, minAngle: 1, itemStyle: { borderColor: "#fff", borderWidth: 2 }, label: { show: true, color: "#63707c", fontSize: 10, formatter: (params: { name: string; percent: number }) => `${params.name} ${params.percent.toFixed(2)}%`, lineHeight: 14, overflow: "break" }, labelLine: { show: true, length: 14, length2: 18, smooth: false, lineStyle: { width: 1 } }, labelLayout: { hideOverlap: false, moveOverlap: "shiftY", draggable: false }, emphasis: { scale: true, scaleSize: 4, label: { show: true, fontWeight: 700 } }, data }],
+    tooltip: { trigger: "item", confine: true, backgroundColor: "#f3f6f6", borderColor: "transparent", borderWidth: 0, borderRadius: 9, padding: [9, 13], shadowBlur: 18, shadowColor: "rgba(35, 57, 62, 0.12)", textStyle: { color: "#20252b", fontSize: 12 }, formatter: (params: { name: string; value: number; percent: number }) => `<strong>${params.name}</strong><br/>¥${money(params.value)} · ${Math.round(params.percent)}%` },
+    series: [{
+      type: "pie",
+      radius: ["32%", "54%"],
+      center: ["50%", "50%"],
+      avoidLabelOverlap: true,
+      minAngle: 2,
+      itemStyle: { borderColor: "#fff", borderWidth: 2 },
+      label: {
+        show: true,
+        position: "outside",
+        color: "#63707c",
+        fontSize: 10,
+        lineHeight: 14,
+        formatter: (params: { name: string; percent: number }) => `${params.name} ${Math.round(params.percent)}%`,
+      },
+      labelLine: { show: true, length: 12, length2: 22, smooth: false, lineStyle: { width: 1, color: "#9aa8ac" } },
+      labelLayout: { hideOverlap: false, moveOverlap: "shiftY", draggable: false, bleedMargin: 6 },
+      emphasis: { scale: true, scaleSize: 4, label: { show: true, fontWeight: 700 } },
+      data,
+    }],
     graphic: [{ type: "text", left: "center", top: "42%", style: { text: `总${type === "income" ? "收入" : "支出"}`, fill: "#8a96a0", fontSize: 12, textAlign: "center" } }, { type: "text", left: "center", top: "51%", style: { text: `¥${money(total)}`, fill: "#20252b", fontSize: 18, fontWeight: 700, textAlign: "center" } }],
   };
-  return <ReactECharts option={option} style={{ height: Math.max(320, Math.min(440, 280 + items.length * 7)), width: "100%" }} opts={{ renderer: "canvas" }} onEvents={{ click: (params: { dataIndex: number }) => { const item = items[params.dataIndex]; if (item) onPick(item); } }} />;
+  return <ReactECharts option={option} style={{ height: Math.max(280, Math.min(360, 245 + chartItems.length * 4)), width: "100%" }} opts={{ renderer: "canvas" }} onEvents={{ click: (params: { dataIndex: number }) => { const item = chartItems[params.dataIndex]; if (item?.id) onPick(item); } }} />;
 }
-
 function FlowCard({ level, expense, income, scopeTitleText, startAt, endAt, onDetail }: { level: "major" | "minor"; expense: CategoryReportItem[]; income: CategoryReportItem[]; scopeTitleText: string; startAt: string; endAt: string; onDetail: (filter: ReportDetailFilter) => void }) {
   const incomeRows = income.slice(0, 8); const expenseRows = expense.slice(0, 8); const open = (item: CategoryReportItem, type: "income" | "expense") => onDetail(categoryFilter(scopeTitleText, startAt, endAt, type, level, item));
   const incomeTotal = income.reduce((sum, item) => sum + item.amountCents, 0); const expenseTotal = expense.reduce((sum, item) => sum + item.amountCents, 0);

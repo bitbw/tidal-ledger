@@ -45,6 +45,22 @@ export const categories = pgTable("categories", {
   index("categories_book_archived_idx").on(table.bookId, table.archivedAt),
 ]);
 
+export const importCategoryRules = pgTable("import_category_rules", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  bookId: uuid("book_id").notNull().references(() => books.id, { onDelete: "cascade" }),
+  pattern: text("pattern").notNull(),
+  matchType: text("match_type").notNull().default("contains"),
+  direction: text("direction").notNull().default("any"),
+  categoryId: uuid("category_id").notNull().references(() => categories.id, { onDelete: "restrict" }),
+  priority: integer("priority").notNull().default(0),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("import_category_rules_book_pattern_type_direction_idx").on(table.bookId, table.pattern, table.matchType, table.direction),
+  index("import_category_rules_book_enabled_idx").on(table.bookId, table.enabled),
+]);
+
 export const importBatches = pgTable("import_batches", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
@@ -109,6 +125,7 @@ export const transactions = pgTable("transactions", {
 }, (table) => [
   index("transactions_book_occurred_idx").on(table.bookId, table.occurredAt),
   uniqueIndex("transactions_external_id_idx").on(table.bookId, table.source, table.externalTransactionId),
+  uniqueIndex("transactions_source_row_hash_idx").on(table.bookId, table.source, table.sourceRowHash),
   uniqueIndex("transactions_recurring_scheduled_idx").on(table.recurringEntryId, table.recurrenceScheduledFor),
 ]);
 
