@@ -165,8 +165,19 @@ function MiniTrend({
 function Logo() {
   return (
     <div className="grid size-9 place-items-center rounded-2xl bg-[#e1f7f4] text-[#0c6f78]">
-      <span className="text-lg font-black">潮</span>
+      <TideLedgerIcon className="size-7" />
     </div>
+  );
+}
+
+function TideLedgerIcon({ className }: { className: string }) {
+  return (
+    <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <path d="M8 6.5h13.5A2.5 2.5 0 0 1 24 9v16.5H10.5A2.5 2.5 0 0 1 8 23V6.5Z" fill="currentColor" opacity=".16" />
+      <path d="M8 6.5h13.5A2.5 2.5 0 0 1 24 9v16.5H10.5A2.5 2.5 0 0 1 8 23V6.5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M12 11h8M12 14.5h5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M6 19.5c2.1 0 2.9 2 5 2s2.9-2 5-2 2.9 2 5 2 2.9-2 5-2" stroke="#28c5b4" strokeWidth="2" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -174,8 +185,8 @@ function LoadingScreen() {
   return (
     <main className="grid min-h-screen place-items-center bg-[#f3f6f6]">
       <div className="text-center">
-        <div className="mx-auto grid size-14 place-items-center rounded-[22px] bg-[#0c6f78] text-2xl font-black text-white shadow-lg">
-          潮
+        <div className="mx-auto grid size-14 place-items-center rounded-[22px] bg-[#0c6f78] text-white shadow-lg">
+          <TideLedgerIcon className="size-10" />
         </div>
         <p className="mt-4 text-sm font-medium text-[#65717d]">
           正在连接你的账本…
@@ -474,8 +485,14 @@ export default function HomePage() {
             <button className="grid size-10 place-items-center rounded-xl bg-white text-[#50616a] shadow-sm">
               <BellRing size={18} />
             </button>
-            <button className="grid size-10 place-items-center rounded-xl bg-[#e5f1f0] text-sm font-bold text-[#0c6f78]">
-              B
+            <button
+              type="button"
+              title="用户设置"
+              aria-label="打开用户设置"
+              onClick={() => window.location.assign("/settings")}
+              className="grid size-10 place-items-center rounded-xl bg-[#e5f1f0] text-sm font-bold text-[#0c6f78] transition hover:bg-[#d8eeeb]"
+            >
+              {session.user.name?.slice(0, 1).toUpperCase() || "B"}
             </button>
           </div>
         </header>
