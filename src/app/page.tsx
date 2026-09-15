@@ -794,7 +794,7 @@ function HomeView({
                   <button
                     onClick={() => onEdit(transaction)}
                     className="flex w-full items-center gap-3 text-left"
-                    key={`${title}-${meta}`}
+                    key={transaction.id}
                   >
                     <div
                       className="grid size-10 place-items-center rounded-2xl"
