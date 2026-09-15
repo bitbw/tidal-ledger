@@ -189,7 +189,7 @@ function Donut({ items, type, color, onPick }: { items: CategoryReportItem[]; ty
         lineHeight: 14,
         formatter: (params: { name: string; percent: number }) => `${params.name} ${Math.round(params.percent)}%`,
       },
-      labelLine: { show: true, length: 12, length2: 22, smooth: false, lineStyle: { width: 1, color: "#9aa8ac" } },
+      labelLine: { show: true, length: 7, length2: 14, smooth: false, lineStyle: { width: 1, color: "#9aa8ac" } },
       labelLayout: { hideOverlap: false, moveOverlap: "shiftY", draggable: false, bleedMargin: 6 },
       emphasis: { scale: true, scaleSize: 4, label: { show: true, fontWeight: 700 } },
       data,
