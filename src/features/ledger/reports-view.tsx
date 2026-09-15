@@ -110,22 +110,22 @@ function TrendCard({ title, color, type, buckets, scope, onDetail }: { title: st
   const open = (bucket: ReportBucket) => onDetail({ title: `${rangeTitle(bucket)}${type === "income" ? "收入" : type === "expense" ? "支出" : "流水"}`, startAt: bucket.startAt, endAt: bucket.endAt, types: type === "balance" ? ["income", "expense"] : [type] });
   return <section className="card soft-shadow overflow-hidden p-5">
     <div className="mb-3 flex items-center justify-between"><div><h2 className="text-lg font-bold">{title}</h2><p className="mt-1 text-xs text-[#929ba4]">{scope.type === "month" ? "按日" : scope.type === "year" ? "按月" : "按年"}查看</p></div>{type === "expense" ? <TrendingDown size={20} style={{ color }} /> : <TrendingUp size={20} style={{ color }} />}</div>
-    <TrendChart values={values} color={color} buckets={buckets} onClickIndex={(index) => buckets[index] && open(buckets[index])} />
+    <TrendChart values={values} color={color} buckets={buckets} scope={scope} onClickIndex={(index) => buckets[index] && open(buckets[index])} />
     <div className="mt-3 rounded-xl bg-[#f5f7f7] px-3 py-2.5 text-sm text-[#65717d]">{count ? `${count} 笔 · 合计 ¥${money(amount)}` : "当前范围暂无流水"}</div>
     <div className="mt-2 divide-y divide-[#edf0f0]">{visibleRows.map((bucket) => { const cents = type === "income" ? bucket.incomeCents : type === "expense" ? bucket.expenseCents : bucket.balanceCents; const itemCount = type === "income" ? bucket.incomeCount : type === "expense" ? bucket.expenseCount : bucket.incomeCount + bucket.expenseCount; return <button key={bucket.key} onClick={() => open(bucket)} className="flex w-full items-center gap-3 py-3 text-left hover:bg-[#f8fbfb]"><span className="grid size-9 place-items-center rounded-full text-xs font-bold" style={{ color, background: `${color}16` }}>{bucket.label.replace(/^\d{4}年/, "")}</span><span className="min-w-0 flex-1"><b className="block truncate text-sm">{bucket.label}</b><small className="text-[#929ba4]">{itemCount} 笔</small></span><b className="money text-base" style={{ color: type === "balance" && cents < 0 ? "#d95d3d" : undefined }}>{cents < 0 ? "-" : ""}¥{money(Math.abs(cents))}</b></button>; })}</div>
     {rows.length > 3 && <button onClick={() => setExpanded((value) => !value)} className="mt-2 w-full rounded-xl py-2 text-sm font-medium text-[#16766b] hover:bg-[#f1f8f7]">{expanded ? "收起" : `查看全部 ${rows.length} 个时间段`}</button>}
   </section>;
 }
 
-function TrendChart({ values, color, buckets, onClickIndex }: { values: number[]; color: string; buckets: ReportBucket[]; onClickIndex: (index: number) => void }) {
+function TrendChart({ values, color, buckets, scope, onClickIndex }: { values: number[]; color: string; buckets: ReportBucket[]; scope: LedgerReportScope; onClickIndex: (index: number) => void }) {
   if (!values.length) return <div className="grid h-52 place-items-center text-sm text-[#98a1aa]">暂无趋势数据</div>;
-  const labels = buckets.map((bucket) => bucket.label.replace(/^\d{4}年/, ""));
+  const labels = buckets.map((bucket) => scope.type === "all" ? bucket.label : bucket.label.replace(/^\d{4}年/, ""));
   const average = values.reduce((sum, value) => sum + value, 0) / values.length;
   const option = {
     animationDuration: 350,
     grid: { left: 8, right: 12, top: 28, bottom: 24, containLabel: true },
     xAxis: { type: "category", boundaryGap: false, data: labels, axisLine: { lineStyle: { color: "#e2e9e9" } }, axisTick: { show: false }, axisLabel: { color: "#98a1aa", fontSize: 10, interval: "auto" } },
-    yAxis: { type: "value", scale: true, splitNumber: 4, axisLabel: { color: "#98a1aa", fontSize: 10, formatter: (value: number) => `¥${Math.round(value)}` }, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: "#e8eeee", type: "dashed" } } },
+    yAxis: { type: "value", scale: true, splitNumber: 4, axisLabel: { color: "#98a1aa", fontSize: 10, formatter: (value: number) => `¥${money(value)}` }, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: "#e8eeee", type: "dashed" } } },
     tooltip: { trigger: "axis", confine: true, enterable: false, transitionDuration: 0.15, backgroundColor: "#f3f6f6", borderColor: "transparent", borderWidth: 0, borderRadius: 9, padding: [9, 13], shadowBlur: 18, shadowColor: "rgba(35, 57, 62, 0.12)", textStyle: { color: "#20252b", fontSize: 12 }, axisPointer: { type: "line", snap: true, lineStyle: { color: "#cfd8da", width: 1 } }, formatter: (params: { dataIndex: number; axisValue: string; value: number }[]) => { const point = params[0]; return `<div style="font-size:12px;line-height:18px;color:#7f8b96">${buckets[point.dataIndex]?.label ?? point.axisValue}</div><div style="font-size:15px;line-height:22px;font-weight:700;color:#20252b">¥${money(Number(point.value))}</div><div style="margin-top:2px;font-size:11px;line-height:16px;color:#8b94a3">点击查看该时间段明细</div>`; } },
     series: [{ type: "line", data: values, smooth: 0.35, symbol: "circle", symbolSize: 7, showSymbol: values.length <= 31, lineStyle: { color, width: 3 }, itemStyle: { color, borderColor: "#fff", borderWidth: 2 }, areaStyle: { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: `${color}55` }, { offset: 1, color: `${color}05` }] } }, markLine: { silent: true, symbol: "none", lineStyle: { color: `${color}66`, type: "dashed" }, label: { color: "#8d98a2", fontSize: 10, formatter: `均值 ¥${money(Math.round(average))}`, position: "insideEndTop" }, data: [{ yAxis: average }] } }],
   };
@@ -189,7 +189,7 @@ function Donut({ items, type, color, onPick }: { items: CategoryReportItem[]; ty
         lineHeight: 14,
         formatter: (params: { name: string; percent: number }) => `${params.name} ${Math.round(params.percent)}%`,
       },
-      labelLine: { show: true, length: 12, length2: 22, smooth: false, lineStyle: { width: 1, color: "#9aa8ac" } },
+      labelLine: { show: true, length: 7, length2: 14, smooth: false, lineStyle: { width: 1, color: "#9aa8ac" } },
       labelLayout: { hideOverlap: false, moveOverlap: "shiftY", draggable: false, bleedMargin: 6 },
       emphasis: { scale: true, scaleSize: 4, label: { show: true, fontWeight: 700 } },
       data,

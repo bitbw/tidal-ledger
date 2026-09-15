@@ -39,6 +39,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import {
   parseStatementFile,
   type ParsedStatement,
@@ -57,6 +58,18 @@ import { useSession } from "@/lib/auth/client";
 type View = "home" | "reports" | "accounts" | "plans" | "transactions";
 type TransactionKind = "expense" | "income";
 
+const viewPaths: Record<View, string> = {
+  home: "/",
+  reports: "/reports",
+  accounts: "/accounts",
+  plans: "/plans",
+  transactions: "/transactions",
+};
+
+function viewFromPath(pathname: string): View {
+  const match = (Object.entries(viewPaths) as [View, string][]).find(([, path]) => path === pathname);
+  return match?.[0] ?? "home";
+}
 const navItems: { id: View; label: string; icon: typeof Home }[] = [
   { id: "accounts", label: "账户", icon: WalletCards },
   { id: "plans", label: "计划", icon: Target },
@@ -234,9 +247,11 @@ function LoginScreen() {
 
 export default function HomePage() {
   const { data: session, isPending: authLoading } = useSession();
-  const [view, setView] = useState<View>("home");
+  const pathname = usePathname();
+  const router = useRouter();
+  const [view, setView] = useState<View>(() => viewFromPath(pathname));
   const [composerOpen, setComposerOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(() => pathname === "/imports");
   const [categoryAdminOpen, setCategoryAdminOpen] = useState(false);
   const [mappingOpen, setMappingOpen] = useState(false);
   const [importStep, setImportStep] = useState<"choose" | "preview" | "done">(
@@ -256,6 +271,22 @@ export default function HomePage() {
   >(null);
   const [toast, setToast] = useState("");
   const [mobileMenu, setMobileMenu] = useState(false);
+  useEffect(() => {
+    setView(viewFromPath(pathname));
+    setImportOpen(pathname === "/imports");
+    if (pathname === "/imports") setImportStep("choose");
+  }, [pathname]);
+
+  function navigateView(nextView: View) {
+    if (pathname !== viewPaths[nextView]) router.push(viewPaths[nextView]);
+    setView(nextView);
+  }
+  function openImportPage() {
+    router.push("/imports");
+    setImportOpen(true);
+    setImportStep("choose");
+  }
+
   const ledger = useLedger(Boolean(session?.user));
   const recurring = useRecurringEntries(Boolean(session?.user));
 
@@ -433,7 +464,7 @@ export default function HomePage() {
           {navItems.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
-              onClick={() => setView(id)}
+              onClick={() => navigateView(id)}
               className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${view === id ? "bg-[#e8f6f4] font-semibold text-[#0c6f78]" : "text-[#68727e] hover:bg-[#f5f8f8]"}`}
             >
               <Icon size={19} strokeWidth={view === id ? 2.4 : 1.8} />
@@ -448,10 +479,7 @@ export default function HomePage() {
             微信、支付宝账单一键整理，重复账目自动跳过。
           </p>
           <button
-            onClick={() => {
-              setImportOpen(true);
-              setImportStep("choose");
-            }}
+            onClick={openImportPage}
             className="mt-4 rounded-lg bg-white px-3 py-2 text-xs font-bold text-[#0c6f78]"
           >
             导入账单
@@ -473,10 +501,7 @@ export default function HomePage() {
           <h1 className="hidden text-xl font-semibold md:block">{headline}</h1>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => {
-                setImportOpen(true);
-                setImportStep("choose");
-              }}
+              onClick={openImportPage}
               className="hidden items-center gap-2 rounded-xl border border-[#dce7e6] bg-white px-3 py-2 text-sm font-medium text-[#365158] hover:bg-[#f6fbfa] sm:flex"
             >
               <FileUp size={16} />
@@ -501,7 +526,7 @@ export default function HomePage() {
             {navItems.map(({ id, label, icon: Icon }) => (
               <button
                 onClick={() => {
-                  setView(id);
+                  navigateView(id);
                   setMobileMenu(false);
                 }}
                 className={`grid place-items-center gap-1 rounded-xl p-2 text-xs ${view === id ? "bg-[#e8f6f4] text-[#0c6f78]" : "text-[#6b7580]"}`}
@@ -528,17 +553,14 @@ export default function HomePage() {
             onEdit={openTransactionEditor}
             onSelectDay={(date) => {
               setTransactionDateFilter(date);
-              setView("transactions");
+              navigateView("transactions");
             }}
             onViewAll={() => {
               setTransactionDateFilter(null);
-              setView("transactions");
+              navigateView("transactions");
             }}
-            onImport={() => {
-              setImportOpen(true);
-              setImportStep("choose");
-            }}
-            onOpenRecurring={() => setView("plans")}
+            onImport={openImportPage}
+            onOpenRecurring={() => navigateView("plans")}
             onOpenCategoryAdmin={() => setCategoryAdminOpen(true)}
             onOpenMapping={() => setMappingOpen(true)}
             totals={ledger.totals}
@@ -561,7 +583,7 @@ export default function HomePage() {
             onDelete={ledger.deleteTransaction}
             onBack={() => {
               setTransactionDateFilter(null);
-              setView("home");
+              navigateView("home");
             }}
           />
         )}
@@ -578,7 +600,7 @@ export default function HomePage() {
       <nav className="fixed inset-x-0 bottom-0 z-10 flex h-[68px] items-center justify-around border-t border-[#e7eeee] bg-white/95 px-3 backdrop-blur md:hidden">
         {navItems.map(({ id, label, icon: Icon }) => (
           <button
-            onClick={() => setView(id)}
+            onClick={() => navigateView(id)}
             className={`grid min-w-12 place-items-center gap-1 text-[11px] ${view === id ? "font-bold text-[#0c6f78]" : "text-[#7d8792]"}`}
             key={id}
           >
@@ -637,7 +659,7 @@ export default function HomePage() {
           categories={ledger.categories}
           accounts={ledger.accounts}
           onImported={() => void ledger.refresh()}
-          onClose={() => setImportOpen(false)}
+          onClose={() => { setImportOpen(false); router.push("/"); }}
         />
       )}
       {toast && (
@@ -772,7 +794,7 @@ function HomeView({
                   <button
                     onClick={() => onEdit(transaction)}
                     className="flex w-full items-center gap-3 text-left"
-                    key={`${title}-${meta}`}
+                    key={transaction.id}
                   >
                     <div
                       className="grid size-10 place-items-center rounded-2xl"
