@@ -251,7 +251,7 @@ export default function HomePage() {
   const router = useRouter();
   const [view, setView] = useState<View>(() => viewFromPath(pathname));
   const [composerOpen, setComposerOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(() => pathname === "/imports");
   const [categoryAdminOpen, setCategoryAdminOpen] = useState(false);
   const [mappingOpen, setMappingOpen] = useState(false);
   const [importStep, setImportStep] = useState<"choose" | "preview" | "done">(
@@ -273,11 +273,18 @@ export default function HomePage() {
   const [mobileMenu, setMobileMenu] = useState(false);
   useEffect(() => {
     setView(viewFromPath(pathname));
+    setImportOpen(pathname === "/imports");
+    if (pathname === "/imports") setImportStep("choose");
   }, [pathname]);
 
   function navigateView(nextView: View) {
     if (pathname !== viewPaths[nextView]) router.push(viewPaths[nextView]);
     setView(nextView);
+  }
+  function openImportPage() {
+    router.push("/imports");
+    setImportOpen(true);
+    setImportStep("choose");
   }
 
   const ledger = useLedger(Boolean(session?.user));
@@ -472,10 +479,7 @@ export default function HomePage() {
             微信、支付宝账单一键整理，重复账目自动跳过。
           </p>
           <button
-            onClick={() => {
-              setImportOpen(true);
-              setImportStep("choose");
-            }}
+            onClick={openImportPage}
             className="mt-4 rounded-lg bg-white px-3 py-2 text-xs font-bold text-[#0c6f78]"
           >
             导入账单
@@ -497,10 +501,7 @@ export default function HomePage() {
           <h1 className="hidden text-xl font-semibold md:block">{headline}</h1>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => {
-                setImportOpen(true);
-                setImportStep("choose");
-              }}
+              onClick={openImportPage}
               className="hidden items-center gap-2 rounded-xl border border-[#dce7e6] bg-white px-3 py-2 text-sm font-medium text-[#365158] hover:bg-[#f6fbfa] sm:flex"
             >
               <FileUp size={16} />
@@ -558,10 +559,7 @@ export default function HomePage() {
               setTransactionDateFilter(null);
               navigateView("transactions");
             }}
-            onImport={() => {
-              setImportOpen(true);
-              setImportStep("choose");
-            }}
+            onImport={openImportPage}
             onOpenRecurring={() => navigateView("plans")}
             onOpenCategoryAdmin={() => setCategoryAdminOpen(true)}
             onOpenMapping={() => setMappingOpen(true)}
@@ -661,7 +659,7 @@ export default function HomePage() {
           categories={ledger.categories}
           accounts={ledger.accounts}
           onImported={() => void ledger.refresh()}
-          onClose={() => setImportOpen(false)}
+          onClose={() => { setImportOpen(false); router.push("/"); }}
         />
       )}
       {toast && (
