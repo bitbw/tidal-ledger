@@ -20,7 +20,7 @@ export function NavBar() {
           <Image
             className="lg:h-7 lg:w-auto dark:hidden"
             src="/logo.svg"
-            alt="Neon logo"
+            alt="潮汐账本"
             width={88}
             height={24}
             priority
@@ -28,7 +28,7 @@ export function NavBar() {
           <Image
             className="hidden lg:h-7 lg:w-auto dark:block"
             src="/logo-dark.svg"
-            alt="Neon logo"
+            alt="潮汐账本"
             width={88}
             height={24}
             priority
