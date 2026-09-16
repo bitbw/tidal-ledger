@@ -4,7 +4,7 @@ import "./globals.css";
 import { inter } from "./fonts";
 
 export const metadata: Metadata = {
-  title: "潮汐账本 · Neon",
+  title: "潮汐账本",
   description: "快速记账、账单导入与消费报表",
   icons: { icon: "/icon.svg" },
 };

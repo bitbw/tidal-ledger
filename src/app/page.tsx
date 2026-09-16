@@ -178,29 +178,16 @@ function MiniTrend({
 function Logo() {
   return (
     <div className="grid size-9 place-items-center rounded-2xl bg-[#e1f7f4] text-[#0c6f78]">
-      <TideLedgerIcon className="size-7" />
+      <img src="/icon.svg" alt="潮汐账本" className="size-7" />
     </div>
-  );
-}
-
-function TideLedgerIcon({ className }: { className: string }) {
-  return (
-    <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <path d="M8 6.5h13.5A2.5 2.5 0 0 1 24 9v16.5H10.5A2.5 2.5 0 0 1 8 23V6.5Z" fill="currentColor" opacity=".16" />
-      <path d="M8 6.5h13.5A2.5 2.5 0 0 1 24 9v16.5H10.5A2.5 2.5 0 0 1 8 23V6.5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-      <path d="M12 11h8M12 14.5h5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M6 19.5c2.1 0 2.9 2 5 2s2.9-2 5-2 2.9 2 5 2 2.9-2 5-2" stroke="#28c5b4" strokeWidth="2" strokeLinecap="round" />
-    </svg>
   );
 }
 
 function LoadingScreen() {
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f3f6f6]">
+    <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_50%_42%,#ffffff_0%,#f3f8f7_48%,#e8f2f1_100%)]">
       <div className="text-center">
-        <div className="mx-auto grid size-14 place-items-center rounded-[22px] bg-[#0c6f78] text-white shadow-lg">
-          <TideLedgerIcon className="size-10" />
-        </div>
+        <img src="/icon.svg" alt="" className="mx-auto block size-16 drop-shadow-[0_12px_24px_rgba(23,107,120,.2)]" />
         <p className="mt-4 text-sm font-medium text-[#65717d]">
           正在连接你的账本…
         </p>
