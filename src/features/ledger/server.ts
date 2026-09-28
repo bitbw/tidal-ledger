@@ -1,5 +1,6 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db/client";
+import { user } from "@/lib/auth/schema";
 import {
   accounts,
   bookMembers,
@@ -30,6 +31,13 @@ export type CategoryInput = {
 
 async function ensureDefaultCategories(bookId: string) {
   await db.transaction(async (tx) => {
+    // Serialize default-category seeding across concurrent requests for this book.
+    await tx
+      .select({ id: books.id })
+      .from(books)
+      .where(eq(books.id, bookId))
+      .for("update");
+
     const rows = await tx
       .select()
       .from(categories)
@@ -136,6 +144,14 @@ export async function ensureDefaultLedger(userId: string) {
   }
 
   const bookId = await db.transaction(async (tx) => {
+    // Lock the authenticated user row so parallel first-time requests cannot
+    // create multiple default books before a book_members row exists.
+    await tx
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.id, userId))
+      .for("update");
+
     const again = await tx.query.bookMembers.findFirst({
       where: eq(bookMembers.userId, userId),
     });
