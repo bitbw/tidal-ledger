@@ -46,6 +46,7 @@ import {
 } from "@/features/importers/parse-statement";
 import { ImportPreviewEditor, type ImportPreviewRow } from "@/features/importers/import-preview-editor";
 import { defaultImportMappings, suggestImportCategory } from "@/features/importers/suggest-category";
+import { CategoryPickerSheet, categoryIcon } from "@/features/ledger/category-picker-sheet";
 import {
   useLedger,
   type LedgerCategory,
@@ -76,25 +77,6 @@ const navItems: { id: View; label: string; icon: typeof Home }[] = [
   { id: "home", label: "首页", icon: Home },
   { id: "reports", label: "报表", icon: BarChart3 },
 ];
-
-function categoryIcon(icon?: string | null) {
-  switch (icon) {
-    case "coffee": return Coffee;
-    case "car": return ArrowLeftRight;
-    case "bike": return Bike;
-    case "plane": return Plane;
-    case "shopping-bag": return ShoppingBag;
-    case "shirt": return Shirt;
-    case "home": return Home;
-    case "heart": return Heart;
-    case "wallet": return WalletCards;
-    case "badge-plus": return BadgePlus;
-    case "zap": return Zap;
-    case "landmark": return Landmark;
-    case "trending-up": return TrendingUp;
-    default: return Utensils;
-  }
-}
 
 function yuan(value: number) {
   return new Intl.NumberFormat("zh-CN", {
@@ -238,7 +220,6 @@ export default function HomePage() {
   const router = useRouter();
   const [view, setView] = useState<View>(() => viewFromPath(pathname));
   const [composerOpen, setComposerOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(() => pathname === "/imports");
   const [categoryAdminOpen, setCategoryAdminOpen] = useState(false);
   const [mappingOpen, setMappingOpen] = useState(false);
   const [importStep, setImportStep] = useState<"choose" | "preview" | "done">(
@@ -260,7 +241,6 @@ export default function HomePage() {
   const [mobileMenu, setMobileMenu] = useState(false);
   useEffect(() => {
     setView(viewFromPath(pathname));
-    setImportOpen(pathname === "/imports");
     if (pathname === "/imports") setImportStep("choose");
   }, [pathname]);
 
@@ -270,7 +250,6 @@ export default function HomePage() {
   }
   function openImportPage() {
     router.push("/imports");
-    setImportOpen(true);
     setImportStep("choose");
   }
 
@@ -427,6 +406,21 @@ export default function HomePage() {
 
   if (authLoading) return <LoadingScreen />;
   if (!session?.user) return <LoginScreen />;
+  if (pathname === "/imports") {
+    return (
+      <ImportDialog
+        step={importStep}
+        setStep={setImportStep}
+        categories={ledger.categories}
+        accounts={ledger.accounts}
+        createCategory={ledger.createCategory}
+        updateCategory={ledger.updateCategory}
+        archiveCategory={ledger.archiveCategory}
+        onImported={() => void ledger.refresh()}
+        onClose={() => router.push("/")}
+      />
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[var(--canvas)] pb-24 md:pb-0">
@@ -639,16 +633,6 @@ export default function HomePage() {
         />
       )}
       {mappingOpen && <ImportMappingDialog categories={ledger.categories} onClose={() => setMappingOpen(false)} />}
-      {importOpen && (
-        <ImportDialog
-          step={importStep}
-          setStep={setImportStep}
-          categories={ledger.categories}
-          accounts={ledger.accounts}
-          onImported={() => void ledger.refresh()}
-          onClose={() => { setImportOpen(false); router.push("/"); }}
-        />
-      )}
       {toast && (
         <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-[#20252b] px-4 py-2.5 text-sm text-white shadow-xl">
           {toast}
@@ -1826,21 +1810,6 @@ function Composer({
     ".",
     "0",
   ];
-  const roots = allCategories.filter(
-    (category) => category.kind === "expense" && !category.parentId,
-  );
-  const pickerItems =
-    kind === "income"
-      ? allCategories.filter(
-          (category) => category.kind === "income" && !category.parentId,
-        )
-      : activeParentId
-        ? allCategories.filter(
-            (category) =>
-              category.kind === "expense" && category.parentId === activeParentId,
-          )
-        : roots;
-  const activeParent = roots.find((category) => category.id === activeParentId);
   const selectCategory = (category: LedgerCategory) => {
     setSelectedCategoryId(category.id);
     setPickerOpen(false);
@@ -2015,54 +1984,17 @@ function Composer({
         </div>
       </section>
       {pickerOpen && (
-        <div className="absolute inset-0 z-10 flex items-end bg-black/35 md:items-center md:justify-center">
-          <section className="max-h-[82dvh] w-full overflow-hidden rounded-t-[28px] bg-white shadow-2xl md:max-w-[560px] md:rounded-[28px]">
-            <header className="flex items-center justify-between border-b border-[#edf0f0] px-5 py-4">
-              <button
-                onClick={() => {
-                  if (activeParentId) setActiveParentId(null);
-                  else setPickerOpen(false);
-                }}
-                className="grid size-9 place-items-center rounded-full bg-[#f2f5f5]"
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <div className="text-center">
-                <p className="font-bold">选择分类</p>
-                {activeParent && <p className="text-xs text-[#8b94a3]">{activeParent.name}</p>}
-              </div>
-              <button onClick={() => setPickerOpen(false)} className="grid size-9 place-items-center rounded-full bg-[#f2f5f5]">
-                <X size={18} />
-              </button>
-            </header>
-            <div className="max-h-[54dvh] overflow-y-auto px-5 py-3">
-              {pickerItems.map((category) => {
-                const Icon = categoryIcon(category.icon);
-                const isParent = kind === "expense" && !activeParentId;
-                return (
-                  <button
-                    key={category.id}
-                    onClick={() => isParent ? setActiveParentId(category.id) : selectCategory(category)}
-                    className="flex w-full items-center gap-3 border-b border-[#f0f2f2] py-4 text-left last:border-0"
-                  >
-                    <span className={`grid size-10 place-items-center rounded-2xl ${categoryIconStyle}`}>
-                      <Icon size={20} />
-                    </span>
-                    <span className="flex-1 font-medium">{category.name}</span>
-                    {isParent ? <ChevronRight size={18} className="text-[#a5adb6]" /> : category.id === selectedCategoryId ? <span className={`text-sm font-bold ${selectedTextStyle}`}>已选</span> : null}
-                  </button>
-                );
-              })}
-              {!pickerItems.length && (
-                <p className="py-10 text-center text-sm text-[#8b94a3]">当前大类还没有小类。</p>
-              )}
-            </div>
-            <footer className="flex border-t border-[#edf0f0] text-[#ff714b]">
-              <button onClick={() => setAdminMode("new")} className="flex-1 py-4 text-sm font-bold">+ 新增分类</button>
-              <button onClick={() => setAdminMode("manage")} className="flex-1 border-l border-[#edf0f0] py-4 text-sm font-bold">管理</button>
-            </footer>
-          </section>
-        </div>
+        <CategoryPickerSheet
+          kind={kind}
+          categories={allCategories}
+          selectedCategoryId={selectedCategoryId}
+          activeParentId={activeParentId}
+          setActiveParentId={setActiveParentId}
+          onClose={() => setPickerOpen(false)}
+          onSelect={selectCategory}
+          onAddCategory={() => setAdminMode("new")}
+          onManageCategories={() => setAdminMode("manage")}
+        />
       )}
       {adminMode && (
         <CategoryAdminDialog
@@ -2241,6 +2173,9 @@ function ImportDialog({
   setStep,
   categories,
   accounts,
+  createCategory,
+  updateCategory,
+  archiveCategory,
   onImported,
   onClose,
 }: {
@@ -2248,6 +2183,9 @@ function ImportDialog({
   setStep: (s: "choose" | "preview" | "done") => void;
   categories: LedgerCategory[];
   accounts: { id: string; name: string; color: string }[];
+  createCategory: (input: { name: string; kind: "expense" | "income"; parentId?: string | null; icon?: string | null; color?: string }) => Promise<LedgerCategory>;
+  updateCategory: (id: string, input: { name: string; kind: "expense" | "income"; parentId?: string | null; icon?: string | null; color?: string }) => Promise<LedgerCategory>;
+  archiveCategory: (id: string) => Promise<LedgerCategory>;
   onImported: () => void;
   onClose: () => void;
 }) {
@@ -2261,6 +2199,7 @@ function ImportDialog({
   const [result, setResult] = useState<{ imported: number; duplicates: number; skipped: number } | null>(null);
   const [showSkipped, setShowSkipped] = useState(false);
   const [showMapping, setShowMapping] = useState(false);
+  const [categoryAdminTarget, setCategoryAdminTarget] = useState<{ mode: "manage" | "new"; row: ImportPreviewRow; parentId: string | null } | null>(null);
   const openFilePicker = () => inputRef.current?.click();
   const readFile = async (file?: File) => {
     if (!file) return;
@@ -2321,17 +2260,16 @@ function ImportDialog({
         ? "微信支付"
         : "通用账单";
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-[#102124]/35 p-4 backdrop-blur-sm">
-      <section className={`w-full max-w-[620px] overflow-hidden rounded-[28px] bg-white shadow-2xl ${step === "preview" ? "flex h-[calc(100dvh-2rem)] max-h-[860px] flex-col" : ""}`}>
-        <header className="flex items-center justify-between border-b border-[#ebeeee] px-6 py-5">
+    <div className="min-h-[100dvh] bg-[#f5f7f7]">
+      <section className={`mx-auto flex min-h-[100dvh] w-full flex-col overflow-hidden bg-white md:max-w-[1120px] md:shadow-[0_0_50px_rgba(16,33,36,.08)] ${step === "preview" ? "h-[100dvh]" : ""}`}>
+        <header className="sticky top-0 z-20 flex shrink-0 items-center justify-between border-b border-[#ebeeee] bg-white px-4 py-3 md:px-6">
           <div>
-            <p className="text-lg font-bold">导入账单</p>
-            <p className="mt-1 text-sm text-[#8b94a3]">
-              原始文件只在你的浏览器中解析
-            </p>
+            <p className="text-base font-bold">导入账单</p>
+            <p className="text-xs text-[#8b94a3]">文件在浏览器本地解析</p>
           </div>
           <button
             onClick={onClose}
+            aria-label="返回账本"
             className="grid size-9 place-items-center rounded-full bg-[#f3f6f6]"
           >
             <X size={19} />
@@ -2391,46 +2329,35 @@ function ImportDialog({
           </div>
         )}
         {step === "preview" && parsed && (
-          <div className="flex min-h-0 flex-1 flex-col p-4 sm:p-6">
-            <div className="rounded-2xl bg-[#eaf8f6] p-4">
-              <p className="font-bold text-[#0c6f78]">
-                已识别：{sourceName}账单
-              </p>
-              <p className="mt-1 text-sm text-[#47716f]">
-                {parsed.filename} · 已解析 {rows.length} 条有效记录
-              </p>
-              <div className="mt-3 flex gap-4 text-sm">
-                <span>
-                  <b>{selectedRows.length}</b> 已选
-                </span>
-                <button type="button" onClick={() => setShowSkipped(true)} disabled={!parsed.skippedRows.length} className="text-left disabled:opacity-50">
-                  <b>{parsed.skipped}</b> 无效记录
-                </button>
-                <span>
-                  <b>
-                    {rows.filter((row) => row.duplicate).length}
-                  </b>{" "}
-                  重复
-                </span>
+          <div className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-2 sm:px-5">
+            <div className="flex shrink-0 items-center justify-between gap-2 rounded-xl bg-[#eaf8f6] px-3 py-2">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-[#0c6f78]">{sourceName} · {rows.length} 条记录</p>
+                <p className="truncate text-[11px] text-[#47716f]">{parsed.filename}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2.5 text-xs text-[#47716f]">
+                <span className="whitespace-nowrap"><b>{selectedRows.length}</b> 已选</span>
+                <button type="button" onClick={() => setShowSkipped(true)} disabled={!parsed.skippedRows.length} className="whitespace-nowrap disabled:opacity-50"><b>{parsed.skipped}</b> 无效</button>
+                <span className="whitespace-nowrap"><b>{rows.filter((row) => row.duplicate).length}</b> 重复</span>
               </div>
             </div>
-            <div className="mt-5 flex gap-2 overflow-x-auto pb-1">{([ ["all", "全部"], ["ready", "可导入"], ["issue", "待处理"], ["duplicate", "重复"] ] as const).map(([id, label]) => <button key={id} onClick={() => setFilter(id)} className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium ${filter === id ? "bg-[#0c6f78] text-white" : "bg-[#eff4f4] text-[#65717d]"}`}>{label}</button>)}</div>
-            <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-              {visibleRows.map((row) => <ImportPreviewEditor key={row.clientKey} row={row} accounts={accounts} categories={categories} onChange={(patch) => updateRow(row.clientKey, patch)} onSaveRule={() => saveImportRule(row)} />)}
+            <div className="mt-2 flex shrink-0 gap-2 overflow-x-auto pb-1">{([ ["all", "全部"], ["ready", "可导入"], ["issue", "待处理"], ["duplicate", "重复"] ] as const).map(([id, label]) => <button key={id} onClick={() => setFilter(id)} className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${filter === id ? "bg-[#0c6f78] text-white" : "bg-[#eff4f4] text-[#65717d]"}`}>{label}</button>)}</div>
+            <div className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1">
+              {visibleRows.map((row) => <ImportPreviewEditor key={row.clientKey} row={row} accounts={accounts} categories={categories} onChange={(patch) => updateRow(row.clientKey, patch)} onSaveRule={() => saveImportRule(row)} onCategoryAdmin={(mode, targetRow, parentId) => setCategoryAdminTarget({ mode, row: targetRow, parentId })} />)}
               {!visibleRows.length && <p className="py-8 text-center text-sm text-[#8b94a3]">当前筛选下没有流水</p>}
             </div>
-            {error && <p className="mt-3 rounded-xl bg-[#fff0ed] px-3 py-2 text-sm text-[#c54c2c]">{error}</p>}
-            <div className="mt-4 flex shrink-0 gap-3">
+            {error && <p className="mt-2 shrink-0 rounded-xl bg-[#fff0ed] px-3 py-2 text-xs text-[#c54c2c]">{error}</p>}
+            <div className="mt-2 flex shrink-0 gap-2 border-t border-[#edf0f0] bg-white pt-2">
               <button
                 onClick={() => setStep("choose")}
-                className="flex-1 rounded-xl bg-[#f0f4f4] py-3 text-sm font-semibold"
+                className="flex-1 rounded-xl bg-[#f0f4f4] py-2.5 text-sm font-semibold"
               >
                 返回
               </button>
               <button
                 onClick={() => void confirmImport()}
                 disabled={saving}
-                className="flex-[1.6] rounded-xl bg-[#0c6f78] py-3 text-sm font-bold text-white disabled:opacity-60"
+                className="flex-[1.6] rounded-xl bg-[#0c6f78] py-2.5 text-sm font-bold text-white disabled:opacity-60"
               >
                 {saving ? "正在导入…" : `确认导入 ${selectedRows.length} 笔`}
               </button>
@@ -2449,6 +2376,22 @@ function ImportDialog({
               </div>
             </section>
           </div>
+        )}
+        {categoryAdminTarget && (
+          <CategoryAdminDialog
+            startMode={categoryAdminTarget.mode}
+            initialKind={categoryAdminTarget.row.direction === "income" ? "income" : "expense"}
+            initialParentId={categoryAdminTarget.parentId}
+            categories={categories}
+            createCategory={createCategory}
+            updateCategory={updateCategory}
+            archiveCategory={archiveCategory}
+            onClose={() => setCategoryAdminTarget(null)}
+            onCreated={(category) => {
+              updateRow(categoryAdminTarget.row.clientKey, { categoryId: category.id, categorySuggestion: null });
+              setCategoryAdminTarget(null);
+            }}
+          />
         )}
         {step === "done" && (
           <div className="p-8 text-center">
