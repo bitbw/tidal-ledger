@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { createGateway } from "@ai-sdk/gateway";
-import { generateText } from "ai";
+import { generateText, NoObjectGeneratedError, Output } from "ai";
+import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { ensureDefaultLedger } from "@/features/ledger/server";
 import { accounts, categories, importBatches, importCategoryRules, importRows, transactions } from "@/features/ledger/schema";
@@ -43,6 +44,10 @@ function normalizeRuleText(value: string | undefined) {
   return (value ?? "").trim().toLowerCase().replace(/\s+/g, "");
 }
 
+function aiCandidateKey(row: Pick<ImportCandidate, "direction" | "merchantName" | "platformCategory" | "productName">) {
+  return `${row.direction}|${normalizeRuleText(row.merchantName)}|${normalizeRuleText(row.platformCategory)}|${normalizeRuleText(row.productName)}`;
+}
+
 function validRuleInput(input: ImportRuleInput) {
   const pattern = clean(input.pattern);
   if (!pattern || pattern.length > 80) throw new Error("规则关键词需为 1 到 80 个字符。");
@@ -66,58 +71,95 @@ function ruleMatches(rule: typeof importCategoryRules.$inferSelect, row: ImportC
 async function suggestWithAi(rows: ImportCandidate[], bookCategories: { id: string; name: string; kind: string; parentId: string | null }[]) {
   if (process.env.IMPORT_AI_ENABLED !== "true" || !process.env.AI_GATEWAY_API_KEY || !rows.length) return new Map<string, { categoryId: string; confidence: number; source: "ai" }>();
   const maxMerchants = Math.max(1, Number(process.env.IMPORT_AI_MAX_UNIQUE_MERCHANTS ?? 60));
-  const unique = [...new Map(rows.map((row) => [`${row.direction}|${normalizeRuleText(row.merchantName)}|${normalizeRuleText(row.platformCategory)}`, row])).values()].slice(0, maxMerchants);
+  const allUnique = [...new Map(rows.map((row) => [aiCandidateKey(row), row])).values()];
+  const unique = allUnique.slice(0, maxMerchants);
   const selectableCategories = bookCategories.filter((category) => category.kind === "income" ? !category.parentId : Boolean(category.parentId));
   const categoriesForPrompt = selectableCategories.map((category, index) => [`c${index}`, category.name] as const);
   const categoryMap = new Map<string, { id: string; name: string; kind: string; parentId: string | null }>(categoriesForPrompt.map(([shortId], index) => [shortId, selectableCategories[index]]));
   if (!categoriesForPrompt.length) return new Map();
-  const input = unique.map((row, index) => ({ key: `m${index}`, direction: row.direction, merchant: clean(row.merchantName).slice(0, 60), description: clean(row.productName).slice(0, 80), platform: clean(row.platformCategory).slice(0, 30) }));
   const model = process.env.IMPORT_AI_MODEL ?? "openai/gpt-4o-mini";
   const logAi = process.env.IMPORT_AI_LOG === "true";
-  try {
-    const gateway = createGateway({ apiKey: process.env.AI_GATEWAY_API_KEY });
-    const prompt = `为每条账单选择最合适的候选分类。只能使用候选分类 ID；无法确定时 category=null。\n只返回一个紧凑 JSON 对象，不要 Markdown、解释或额外文字，格式必须是：{"items":[{"key":"m0","category":"c0","confidence":0.92}]}。confidence 是 0 到 1 的数字。\n候选分类:${JSON.stringify(categoriesForPrompt)}\n账单:${JSON.stringify(input)}`;
-    if (logAi) console.info("[import-ai] request", { model, merchants: input });
-    const result = await generateText({
-      model: gateway.languageModel(model),
-      prompt,
-      maxOutputTokens: Math.min(2000, 400 + unique.length * 80),
-      temperature: 0,
-    });
-    const rawText = result.text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
-    const parsed: unknown = JSON.parse(rawText);
-    if (!parsed || typeof parsed !== "object" || !Array.isArray((parsed as { items?: unknown }).items)) throw new Error("AI 返回的 JSON 格式不正确");
-    const items = (parsed as { items: unknown[] }).items.filter((item): item is { key: string; category: string | null; confidence: number } => {
-      if (!item || typeof item !== "object") return false;
-      const value = item as Record<string, unknown>;
-      return typeof value.key === "string" && (typeof value.category === "string" || value.category === null) && typeof value.confidence === "number" && value.confidence >= 0 && value.confidence <= 1;
-    });
-    if (logAi) {
-      console.info("[import-ai] response", { finishReason: result.finishReason, text: rawText, itemCount: items.length });
-    }
-    const suggestions = new Map<string, { categoryId: string; confidence: number; source: "ai" }>();
-    for (const item of items) {
-      const category = item.category ? categoryMap.get(item.category) : null;
-      const rowIndex = /^m\d+$/.test(item.key) ? Number(item.key.slice(1)) : -1;
-      const row = unique[rowIndex];
+  const gateway = createGateway({ apiKey: process.env.AI_GATEWAY_API_KEY });
+  const suggestions = new Map<string, { categoryId: string; confidence: number; source: "ai" }>();
+  const batchSize = 8;
+  const batchCount = Math.ceil(unique.length / batchSize);
+
+  for (let start = 0; start < unique.length; start += batchSize) {
+    const batch = unique.slice(start, start + batchSize);
+    const input = batch.map((row, index) => ({ key: `m${index}`, direction: row.direction, merchant: clean(row.merchantName).slice(0, 60), description: clean(row.productName).slice(0, 80), platform: clean(row.platformCategory).slice(0, 30) }));
+    const batchNumber = Math.floor(start / batchSize) + 1;
+    const prompt = `为每条账单选择最合适的候选分类。只能使用候选分类 ID；无法确定时 category=null。confidence 是 0 到 1 的数字。\n候选分类:${JSON.stringify(categoriesForPrompt)}\n账单:${JSON.stringify(input)}`;
+    if (logAi) console.info("[import-ai] request", { model, batch: `${batchNumber}/${batchCount}`, merchants: input });
+
+    try {
+      const result = await generateText({
+        model: gateway.languageModel(model),
+        output: Output.object({
+          schema: z.object({
+            items: z.array(z.object({
+              key: z.string(),
+              category: z.string().nullable(),
+              confidence: z.number().min(0).max(1),
+            }).strict()).max(batch.length),
+          }).strict(),
+        }),
+        prompt,
+        maxOutputTokens: 2000,
+        temperature: 0,
+      });
+      const items = result.output.items;
       if (logAi) {
-        console.info("[import-ai] mapping", {
-          key: item.key,
-          merchant: row?.merchantName ?? null,
-          returnedCategory: item.category,
-          mappedCategory: category?.name ?? null,
-          confidence: item.confidence,
-          accepted: Boolean(category && row && item.confidence >= 0.85),
-        });
+        console.info("[import-ai] response", { batch: `${batchNumber}/${batchCount}`, finishReason: result.finishReason, itemCount: items.length, usage: result.usage });
       }
-      if (category && row && item.confidence >= 0.85) suggestions.set(`${row.direction}|${normalizeRuleText(row.merchantName)}|${normalizeRuleText(row.platformCategory)}`, { categoryId: category.id, confidence: item.confidence, source: "ai" });
+      for (const item of items) {
+        const category = item.category ? categoryMap.get(item.category) : null;
+        const rowIndex = /^m\d+$/.test(item.key) ? Number(item.key.slice(1)) : -1;
+        const row = batch[rowIndex];
+        if (logAi) {
+          console.info("[import-ai] mapping", {
+            batch: `${batchNumber}/${batchCount}`,
+            key: item.key,
+            merchant: row?.merchantName ?? null,
+            returnedCategory: item.category,
+            mappedCategory: category?.name ?? null,
+            confidence: item.confidence,
+            accepted: Boolean(category && row && item.confidence >= 0.85),
+          });
+        }
+        if (category && row && item.confidence >= 0.85) suggestions.set(aiCandidateKey(row), { categoryId: category.id, confidence: item.confidence, source: "ai" });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (logAi) {
+        if (NoObjectGeneratedError.isInstance(error)) {
+          console.warn("[import-ai] error details", {
+            batch: `${batchNumber}/${batchCount}`,
+            name: error.name,
+            message: error.message,
+            finishReason: error.finishReason,
+            usage: error.usage,
+            cause: error.cause instanceof Error ? { name: error.cause.name, message: error.cause.message } : null,
+            generatedTextLength: error.text?.length ?? 0,
+            generatedTextPreview: error.text?.slice(0, 2000) ?? null,
+            generatedTextTruncated: Boolean(error.text && error.text.length > 2000),
+          });
+        } else {
+          console.warn("[import-ai] error details", {
+            batch: `${batchNumber}/${batchCount}`,
+            name: error instanceof Error ? error.name : typeof error,
+            message,
+            cause: error instanceof Error && error.cause instanceof Error
+              ? { name: error.cause.name, message: error.cause.message }
+              : null,
+          });
+        }
+      }
+      console.warn("[import-ai] classification unavailable", { batch: `${batchNumber}/${batchCount}`, message });
     }
-    return suggestions;
-  } catch (error) {
-    if (logAi) console.warn("[import-ai] error", error instanceof Error ? error.message : error);
-    console.warn("[import-ai] classification unavailable", error instanceof Error ? error.message : error);
-    return new Map();
   }
+
+  if (logAi && allUnique.length > unique.length) console.info("[import-ai] candidates capped", { uniqueCandidates: allUnique.length, uniqueCandidatesSent: unique.length, maxMerchants });
+  return suggestions;
 }
 
 export async function listImportRules(userId: string) {
@@ -198,8 +240,7 @@ export async function checkImportRows(userId: string, source: ImportSource, rows
   }
   const aiSuggestions = await suggestWithAi(unresolved, bookCategories);
   for (const row of unresolved) {
-    const key = `${row.direction}|${normalizeRuleText(row.merchantName)}|${normalizeRuleText(row.platformCategory)}`;
-    const suggestion = aiSuggestions.get(key);
+    const suggestion = aiSuggestions.get(aiCandidateKey(row));
     if (suggestion) suggestions.set(row.clientKey, suggestion);
   }
   const seenOrders = new Set<string>();
