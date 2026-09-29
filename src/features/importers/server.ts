@@ -104,7 +104,7 @@ async function suggestWithAi(rows: ImportCandidate[], bookCategories: { id: stri
           }).strict(),
         }),
         prompt,
-        maxOutputTokens: 2000,
+        maxOutputTokens: 8000,
         temperature: 0,
       });
       const items = result.output.items;
