@@ -2271,8 +2271,8 @@ function ImportDialog({
             <p className="text-xs text-[#8b94a3]">文件在浏览器本地解析</p>
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setShowMapping(true)} className="inline-flex h-10 w-20 shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-[#eaf8f6] text-xs font-semibold text-[#0c6f78] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0c6f78]">映射管理</button>
-            <Link href="/imports/help" target="_blank" rel="noopener noreferrer" title="在新标签页打开，不影响当前预览" className="inline-flex h-10 w-20 shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-[#f3f6f6] text-xs font-semibold text-[#65717d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0c6f78]">使用说明</Link>
+            <button type="button" onClick={() => setShowMapping(true)} className="inline-flex h-10 w-20 shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-[#eaf8f6] text-sm font-semibold text-[#0c6f78] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0c6f78]">映射管理</button>
+            <Link href="/imports/help" target="_blank" rel="noopener noreferrer" title="在新标签页打开，不影响当前预览" className="inline-flex h-10 w-20 shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-[#f3f6f6] text-sm font-semibold text-[#65717d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0c6f78]">使用说明</Link>
             <button
               onClick={onClose}
               aria-label="返回账本"

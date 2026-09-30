@@ -23,7 +23,9 @@ body {
   font-family: Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
-button, input { font: inherit; }
+@layer base {
+  button, input { font: inherit; }
+}
 button { cursor: pointer; }
 
 ::-webkit-scrollbar { width: 7px; height: 7px; }
