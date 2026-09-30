@@ -47,13 +47,40 @@ function normalizeHeader(value: unknown) {
   return String(value ?? "").trim().replace(/\s/g, "");
 }
 
-function readCell(record: Record<string, unknown>, keys: string[]) {
+function readRawCell(record: Record<string, unknown>, keys: string[]) {
   const entries = Object.entries(record);
   for (const key of keys) {
     const match = entries.find(([header]) => normalizeHeader(header) === normalizeHeader(key));
-    if (match) return String(match[1] ?? "").trim();
+    if (match) return match[1] ?? "";
   }
   return "";
+}
+
+function readCell(record: Record<string, unknown>, keys: string[]) {
+  return String(readRawCell(record, keys)).trim();
+}
+
+function formatBeijingDateTime(year: number, month: number, day: number, hour = 0, minute = 0, second = 0, fraction = "") {
+  const milliseconds = fraction ? `.${fraction.padEnd(3, "0")}` : "";
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:${String(second).padStart(2, "0")}${milliseconds}+08:00`;
+}
+
+function normalizeOccurredAt(value: unknown) {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return "";
+    // Excel serial dates are decoded as Date objects whose UTC fields preserve the workbook's wall-clock time.
+    return formatBeijingDateTime(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate(), value.getUTCHours(), value.getUTCMinutes(), value.getUTCSeconds(), String(value.getUTCMilliseconds()).padStart(3, "0"));
+  }
+
+  const text = String(value ?? "").trim();
+  if (!text || /(?:z|[+-]\d{2}:?\d{2})$/i.test(text)) return text;
+  const match = text.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?)?$/);
+  if (!match) return text;
+  return formatBeijingDateTime(Number(match[1]), Number(match[2]), Number(match[3]), Number(match[4] ?? 0), Number(match[5] ?? 0), Number(match[6] ?? 0), match[7] ?? "");
+}
+
+function readOccurredAt(record: Record<string, unknown>, keys: string[]) {
+  return normalizeOccurredAt(readRawCell(record, keys));
 }
 
 function parseAmount(value: string) {
@@ -99,7 +126,7 @@ function normalizeRecords(records: Record<string, unknown>[], headers: string[],
     const directionLabel = readCell(record, aliases.direction);
     return {
       rowNumber: headerIndex + index + 2,
-      occurredAt: readCell(record, aliases.occurredAt),
+      occurredAt: readOccurredAt(record, aliases.occurredAt),
       merchantName: readCell(record, aliases.merchantName) || "未识别商户",
       amountCents: parseAmount(amount),
       direction: classifyDirection(directionLabel, amount),

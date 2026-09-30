@@ -227,7 +227,7 @@ export async function checkImportRows(userId: string, source: ImportSource, rows
     getImportRules(bookId),
     db.select({ id: categories.id, name: categories.name, kind: categories.kind, parentId: categories.parentId }).from(categories).where(and(eq(categories.bookId, bookId), isNull(categories.archivedAt))),
   ]);
-  const suggestions = new Map<string, { categoryId: string; source: "user_rule" | "ai"; confidence: number }>();
+  const suggestions = new Map<string, { categoryId: string; source: "user_rule" | "platform" | "keyword" | "ai"; confidence: number }>();
   const unresolved: ImportCandidate[] = [];
   const localCategories = bookCategories.filter((category): category is typeof category & { kind: "expense" | "income" } => category.kind === "expense" || category.kind === "income");
   for (const row of rows) {
@@ -235,7 +235,7 @@ export async function checkImportRows(userId: string, source: ImportSource, rows
     if (rule) suggestions.set(row.clientKey, { categoryId: rule.categoryId, source: "user_rule", confidence: 1 });
     else {
       const local = suggestImportCategory(row, localCategories);
-      if (local.categoryId) suggestions.set(row.clientKey, { categoryId: local.categoryId, source: local.source === "platform" || local.source === "keyword" ? "user_rule" : "ai", confidence: 1 });
+      if (local.categoryId && local.source) suggestions.set(row.clientKey, { categoryId: local.categoryId, source: local.source, confidence: 1 });
       else if (!row.categoryId) unresolved.push(row);
     }
   }

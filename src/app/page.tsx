@@ -2239,7 +2239,9 @@ function ImportDialog({
   };
   const selectedRows = rows.filter((row) => row.enabled && !row.duplicate);
   const invalidRows = selectedRows.filter((row) => !row.categoryId || row.direction === "unknown" || !row.occurredAt || row.amountCents <= 0);
-  const visibleRows = rows.filter((row) => filter === "all" ? true : filter === "duplicate" ? row.duplicate : filter === "issue" ? Boolean(row.error) || row.direction === "unknown" || (row.enabled && !row.categoryId) : row.enabled && !row.duplicate && row.direction !== "unknown" && Boolean(row.categoryId));
+  const needsAttention = (row: ImportPreviewRow) => Boolean(row.error) || row.direction === "unknown" || (row.enabled && !row.categoryId);
+  const pendingCount = rows.filter(needsAttention).length;
+  const visibleRows = rows.filter((row) => filter === "all" ? true : filter === "duplicate" ? row.duplicate : filter === "issue" ? needsAttention(row) : row.enabled && !row.duplicate && row.direction !== "unknown" && Boolean(row.categoryId));
   const confirmImport = async () => {
     if (!parsed || saving) return;
     if (invalidRows.length) { setError(`还有 ${invalidRows.length} 笔已选记录未完成分类或收支确认。`); return; }
@@ -2269,7 +2271,8 @@ function ImportDialog({
             <p className="text-xs text-[#8b94a3]">文件在浏览器本地解析</p>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/imports/help" target="_blank" rel="noopener noreferrer" title="在新标签页打开，不影响当前预览" className="rounded-xl bg-[#eaf8f6] px-3 py-2 text-xs font-semibold text-[#0c6f78] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0c6f78]">使用说明</Link>
+            <button type="button" onClick={() => setShowMapping(true)} className="inline-flex h-10 w-20 shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-[#eaf8f6] text-xs font-semibold text-[#0c6f78] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0c6f78]">映射管理</button>
+            <Link href="/imports/help" target="_blank" rel="noopener noreferrer" title="在新标签页打开，不影响当前预览" className="inline-flex h-10 w-20 shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-[#f3f6f6] text-xs font-semibold text-[#65717d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0c6f78]">使用说明</Link>
             <button
               onClick={onClose}
               aria-label="返回账本"
@@ -2345,7 +2348,7 @@ function ImportDialog({
                 <span className="whitespace-nowrap"><b>{rows.filter((row) => row.duplicate).length}</b> 重复</span>
               </div>
             </div>
-            <div className="mt-2 flex shrink-0 gap-2 overflow-x-auto pb-1">{([ ["all", "全部"], ["ready", "可导入"], ["issue", "待处理"], ["duplicate", "重复"] ] as const).map(([id, label]) => <button key={id} onClick={() => setFilter(id)} className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${filter === id ? "bg-[#0c6f78] text-white" : "bg-[#eff4f4] text-[#65717d]"}`}>{label}</button>)}</div>
+            <div className="mt-2 flex shrink-0 gap-2 overflow-x-auto pb-1">{([ ["all", "全部"], ["ready", "可导入"], ["issue", "待处理"], ["duplicate", "重复"] ] as const).map(([id, label]) => <button key={id} onClick={() => setFilter(id)} className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${filter === id ? "bg-[#0c6f78] text-white" : "bg-[#eff4f4] text-[#65717d]"}`}>{id === "issue" ? <>{label} <b>{pendingCount}</b></> : label}</button>)}</div>
             <div className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1">
               {visibleRows.map((row) => <ImportPreviewEditor key={row.clientKey} row={row} accounts={accounts} categories={categories} onChange={(patch) => updateRow(row.clientKey, patch)} onSaveRule={() => saveImportRule(row)} onCategoryAdmin={(mode, targetRow, parentId) => setCategoryAdminTarget({ mode, row: targetRow, parentId })} />)}
               {!visibleRows.length && <p className="py-8 text-center text-sm text-[#8b94a3]">当前筛选下没有流水</p>}
@@ -2417,6 +2420,7 @@ function ImportDialog({
           </div>
         )}
       </section>
+      {showMapping && <ImportMappingDialog categories={categories} onClose={() => setShowMapping(false)} />}
     </div>
   );
 }
