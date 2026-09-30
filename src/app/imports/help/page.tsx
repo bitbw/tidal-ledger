@@ -61,9 +61,9 @@ export default function ImportHelpPage() {
             <h2 id="matching" className="text-lg font-bold">分类是怎样匹配的</h2>
             <p className="mt-2 text-sm leading-7 text-[#687982]">按顺序尝试，先命中就不再交给后面的方式：</p>
             <div className="mt-4 rounded-2xl bg-[#f2f8f7] px-4 py-4 text-sm leading-8 text-[#24585d] sm:px-5">
-              <b>我的商户规则</b> → <b>内置平台分类映射</b> → <b>内置关键词</b> → <b>AI 建议</b> → <b>手动选择</b>
+              <b>我的商户规则</b> → <b>商品/商户关键词</b> → <b>餐饮时段分类</b> → <b>平台分类兜底</b> → <b>AI 建议</b> → <b>手动选择</b>
             </div>
-            <p className="mt-3 text-sm leading-7 text-[#687982]">例如，账单平台分类为“餐饮美食”时会默认映射为“午餐”；自己常用但名称难辨认的商户，建议保存专属规则。内置规则只有在目标分类存在时才会匹配。</p>
+            <p className="mt-3 text-sm leading-7 text-[#687982]">系统会先按商品和商户关键词细分到已有小类，再参考平台分类；餐饮美食、外卖和餐馆类记录会按北京时间映射到早餐、午餐、晚餐或夜宵。信息不足的转账和模糊商户不会强行猜分类，常用商户可保存为自己的映射规则。</p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-[#cdeae4] bg-[#f7fcfa] p-4"><b className="text-sm text-[#0c6f78]">AI ≥ 85%</b><p className="mt-2 text-sm leading-6 text-[#65747b]">自动填入，仍可手动修改。</p></div>
               <div className="rounded-2xl border border-[#f1dfb5] bg-[#fffaf0] p-4"><b className="text-sm text-[#93651d]">AI &lt; 85%</b><p className="mt-2 text-sm leading-6 text-[#806f53]">仅显示建议和置信度，点击采纳才会填入。</p></div>
