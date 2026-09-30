@@ -123,10 +123,11 @@ async function suggestWithAi(rows: ImportCandidate[], bookCategories: { id: stri
             returnedCategory: item.category,
             mappedCategory: category?.name ?? null,
             confidence: item.confidence,
-            accepted: Boolean(category && row && item.confidence >= 0.85),
+            accepted: Boolean(category && row && category.kind === row.direction && item.confidence >= 0.85),
+            suggested: Boolean(category && row && category.kind === row.direction && item.confidence < 0.85),
           });
         }
-        if (category && row && item.confidence >= 0.85) suggestions.set(aiCandidateKey(row), { categoryId: category.id, confidence: item.confidence, source: "ai" });
+        if (category && row && category.kind === row.direction) suggestions.set(aiCandidateKey(row), { categoryId: category.id, confidence: item.confidence, source: "ai" });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -251,7 +252,8 @@ export async function checkImportRows(userId: string, source: ImportSource, rows
     const duplicate = orderId ? existing.orderIds.has(orderId) || seenOrders.has(orderId) : existing.hashes.has(hash) || seenHashes.has(hash);
     if (orderId) seenOrders.add(orderId); else seenHashes.add(hash);
     const suggestion = suggestions.get(row.clientKey);
-    return { clientKey: row.clientKey, duplicate, categoryId: suggestion?.categoryId ?? null, categorySuggestion: suggestion?.source ?? null, categoryConfidence: suggestion?.confidence ?? null };
+    const needsConfirmation = suggestion?.source === "ai" && suggestion.confidence < 0.85;
+    return { clientKey: row.clientKey, duplicate, categoryId: needsConfirmation ? null : suggestion?.categoryId ?? null, suggestedCategoryId: needsConfirmation ? suggestion.categoryId : null, categorySuggestion: needsConfirmation ? null : suggestion?.source ?? null, categoryConfidence: suggestion?.confidence ?? null };
   });
 }
 

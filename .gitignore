@@ -45,3 +45,6 @@ next-env.d.ts
 
 # Playwright MCP artifacts
 /.playwright-mcp/
+
+# Local dev logs can contain statement data
+/logs/

@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 5001",
+    "dev": "node scripts/dev-with-log.mjs",
+    "dev:raw": "next dev --port 5001",
     "build": "next build",
     "start": "next start",
     "db:generate": "drizzle-kit generate",

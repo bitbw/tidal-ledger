@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   parseStatementFile,
   type ParsedStatement,
@@ -2213,11 +2214,11 @@ function ImportDialog({
       });
       const check = await fetch("/api/imports/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source: statement.source, rows: preview }) });
       if (!check.ok) throw new Error("账单重复预检失败，请稍后重试。");
-      const duplicateRows = (await check.json()) as { rows: { clientKey: string; duplicate: boolean; categoryId?: string | null; categorySuggestion?: ImportPreviewRow["categorySuggestion"] }[] };
+      const duplicateRows = (await check.json()) as { rows: { clientKey: string; duplicate: boolean; categoryId?: string | null; suggestedCategoryId?: string | null; categoryConfidence?: number | null; categorySuggestion?: ImportPreviewRow["categorySuggestion"] }[] };
       const duplicates = new Map(duplicateRows.rows.map((row) => [row.clientKey, row.duplicate]));
       const checkedSuggestions = new Map(duplicateRows.rows.map((row) => [row.clientKey, row]));
       setParsed(statement);
-      setRows(preview.map((row) => { const checked = checkedSuggestions.get(row.clientKey); return { ...row, categoryId: checked?.categoryId ?? row.categoryId, categorySuggestion: checked?.categorySuggestion ?? row.categorySuggestion, duplicate: duplicates.get(row.clientKey) ?? false, enabled: row.enabled && !(duplicates.get(row.clientKey) ?? false) }; }));
+      setRows(preview.map((row) => { const checked = checkedSuggestions.get(row.clientKey); return { ...row, categoryId: checked?.categoryId ?? row.categoryId, suggestedCategoryId: checked?.suggestedCategoryId ?? null, categoryConfidence: checked?.categoryConfidence ?? null, categorySuggestion: checked?.categorySuggestion ?? row.categorySuggestion, duplicate: duplicates.get(row.clientKey) ?? false, enabled: row.enabled && !(duplicates.get(row.clientKey) ?? false) }; }));
       setStep("preview");
     } catch (cause) {
       setError(
@@ -2267,13 +2268,16 @@ function ImportDialog({
             <p className="text-base font-bold">导入账单</p>
             <p className="text-xs text-[#8b94a3]">文件在浏览器本地解析</p>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="返回账本"
-            className="grid size-9 place-items-center rounded-full bg-[#f3f6f6]"
-          >
-            <X size={19} />
-          </button>
+          <div className="flex items-center gap-2">
+            <Link href="/imports/help" target="_blank" rel="noopener noreferrer" title="在新标签页打开，不影响当前预览" className="rounded-xl bg-[#eaf8f6] px-3 py-2 text-xs font-semibold text-[#0c6f78] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0c6f78]">使用说明</Link>
+            <button
+              onClick={onClose}
+              aria-label="返回账本"
+              className="grid size-9 place-items-center rounded-full bg-[#f3f6f6]"
+            >
+              <X size={19} />
+            </button>
+          </div>
         </header>
         <input
           ref={inputRef}
@@ -2388,7 +2392,7 @@ function ImportDialog({
             archiveCategory={archiveCategory}
             onClose={() => setCategoryAdminTarget(null)}
             onCreated={(category) => {
-              updateRow(categoryAdminTarget.row.clientKey, { categoryId: category.id, categorySuggestion: null });
+              updateRow(categoryAdminTarget.row.clientKey, { categoryId: category.id, suggestedCategoryId: null, categorySuggestion: null, categoryConfidence: null });
               setCategoryAdminTarget(null);
             }}
           />
