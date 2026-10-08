@@ -46,8 +46,10 @@ import {
   type ParsedStatement,
 } from "@/features/importers/parse-statement";
 import { ImportPreviewEditor, type ImportPreviewRow } from "@/features/importers/import-preview-editor";
+import { WheelDateTimePicker } from "@/components/wheel-date-time-picker";
 import { defaultImportMappings, suggestImportCategory } from "@/features/importers/suggest-category";
 import { CategoryPickerSheet, categoryIcon } from "@/features/ledger/category-picker-sheet";
+import { defaultMealCategoryName } from "@/features/ledger/default-meal-category";
 import {
   useLedger,
   type LedgerCategory,
@@ -287,16 +289,22 @@ export default function HomePage() {
   const selectedCategory = ledger.categories.find((category) => category.id === selectedCategoryId);
   const kindLabel = kind === "expense" ? "支出" : "收入";
   const SelectedIcon = categoryIcon(selectedCategory?.icon);
-  const defaultCategoryId = (targetKind: TransactionKind) =>
-    ledger.categories.find(
-      (category) =>
-        category.kind === targetKind &&
-        (targetKind === "income" ? !category.parentId : Boolean(category.parentId)),
-    )?.id ?? "";
+  const defaultCategoryId = (targetKind: TransactionKind, referenceDate = new Date()) => {
+    const matchesKind = (category: LedgerCategory) =>
+      category.kind === targetKind &&
+      (targetKind === "income" ? !category.parentId : Boolean(category.parentId));
+    if (targetKind === "expense") {
+      const mealCategory = ledger.categories.find(
+        (category) => matchesKind(category) && category.name === defaultMealCategoryName(referenceDate),
+      );
+      if (mealCategory) return mealCategory.id;
+    }
+    return ledger.categories.find(matchesKind)?.id ?? "";
+  };
 
   function switchKind(targetKind: TransactionKind) {
     setKind(targetKind);
-    setSelectedCategoryId(defaultCategoryId(targetKind));
+    setSelectedCategoryId(defaultCategoryId(targetKind, occurredAt ? new Date(occurredAt) : new Date()));
   }
 
   const headline = useMemo(() => {
@@ -334,11 +342,13 @@ export default function HomePage() {
   }
 
   function openNewTransaction() {
+    const now = new Date();
     setEditingTransaction(null);
-    switchKind("expense");
+    setKind("expense");
+    setSelectedCategoryId(defaultCategoryId("expense", now));
     setAmount("0");
     setNote("");
-    setOccurredAt(toDateTimeLocal(new Date().toISOString()));
+    setOccurredAt(toDateTimeLocal(now.toISOString()));
     setComposerOpen(true);
   }
 
@@ -351,7 +361,7 @@ export default function HomePage() {
     const transactionKind: TransactionKind = transaction.transactionType === "income" ? "income" : "expense";
     setEditingTransaction(transaction);
     setKind(transactionKind);
-    setSelectedCategoryId(transaction.categoryId ?? defaultCategoryId(transactionKind));
+    setSelectedCategoryId(transaction.categoryId ?? defaultCategoryId(transactionKind, new Date(transaction.occurredAt)));
     setAmount((transaction.amountCents / 100).toFixed(2));
     setNote(transaction.note || "");
     setOccurredAt(toDateTimeLocal(transaction.occurredAt));
@@ -1930,17 +1940,12 @@ function Composer({
           />
           <label className="mt-5 block text-sm font-medium text-[#71808b]">
             发生时间
-            <span className="mt-2 flex items-center rounded-xl bg-white px-3 py-2.5 shadow-sm">
-              <CalendarDays size={16} className="mr-2 shrink-0 text-[#0c6f78]" />
-              <input
-                type="datetime-local"
-                value={occurredAt}
-                onChange={(event) => setOccurredAt(event.target.value)}
-                disabled={saving}
-                className="min-w-0 flex-1 bg-transparent text-sm font-medium text-[#3f4852] outline-none"
-                aria-label="发生日期和时间"
-              />
-            </span>
+            <WheelDateTimePicker
+              value={occurredAt}
+              onChange={setOccurredAt}
+              disabled={saving}
+              className="mt-2 w-full rounded-xl bg-white px-3 py-2.5 text-sm font-medium text-[#3f4852] shadow-sm"
+            />
           </label>
           <div className="mt-5 flex gap-2 overflow-x-auto pb-2">
             {["支付宝", "自己", "商家", "标签"].map(

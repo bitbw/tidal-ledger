@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { CategoryPickerSheet, categoryIcon } from "@/features/ledger/category-picker-sheet";
+import { WheelDateTimePicker } from "@/components/wheel-date-time-picker";
 import type { LedgerCategory } from "@/features/ledger/use-ledger";
 
 export type ImportPreviewRow = {
@@ -80,7 +81,7 @@ export function ImportPreviewEditor({ row, categories, accounts, onChange, onSav
 
     {expanded && <div className="border-t border-[#edf0f0] px-3 pb-3 pt-2">
       <div className="grid grid-cols-2 gap-2.5">
-        <label className="text-xs font-medium text-[#71808b]">时间<input value={localDateTime(row.occurredAt)} onChange={(event) => onChange({ occurredAt: event.target.value ? new Date(event.target.value).toISOString() : "" })} type="datetime-local" disabled={row.duplicate} className="mt-1 w-full rounded-xl bg-[#f3f6f6] px-2.5 py-2.5 text-sm text-[#303b44] outline-none" /></label>
+        <div className="text-xs font-medium text-[#71808b]">时间<WheelDateTimePicker value={localDateTime(row.occurredAt)} onChange={(value) => onChange({ occurredAt: value ? new Date(value).toISOString() : "" })} disabled={row.duplicate} className="mt-1 w-full rounded-xl bg-[#f3f6f6] px-2.5 py-2.5 text-sm text-[#303b44] outline-none" /></div>
         <label className="text-xs font-medium text-[#71808b]">金额<input value={(row.amountCents / 100).toFixed(2)} onChange={(event) => { const cents = Math.round(Number(event.target.value || 0) * 100); onChange({ amountCents: Number.isFinite(cents) ? cents : 0 }); }} inputMode="decimal" disabled={row.duplicate} className="money mt-1 w-full rounded-xl bg-[#f3f6f6] px-2.5 py-2.5 text-base font-bold text-[#303b44] outline-none" /></label>
       </div>
       <div className="mt-2.5 grid grid-cols-3 rounded-xl bg-[#edf2f2] p-1"><button type="button" disabled={row.duplicate} onClick={() => { setActiveParentId(null); onChange({ direction: "expense", categoryId: row.direction === "expense" ? row.categoryId : null, suggestedCategoryId: null, error: null }); }} className={`rounded-lg py-2 text-sm font-bold ${row.direction === "expense" ? "bg-white text-[#0c6f78] shadow-sm" : "text-[#86919a]"}`}>支出</button><button type="button" disabled={row.duplicate} onClick={() => { setActiveParentId(null); onChange({ direction: "income", categoryId: row.direction === "income" ? row.categoryId : null, suggestedCategoryId: null, error: null }); }} className={`rounded-lg py-2 text-sm font-bold ${row.direction === "income" ? "bg-white text-[#ff714b] shadow-sm" : "text-[#86919a]"}`}>收入</button><button type="button" disabled={row.duplicate} onClick={() => onChange({ direction: "unknown", categoryId: null, suggestedCategoryId: null })} className={`rounded-lg py-2 text-sm font-bold ${row.direction === "unknown" ? "bg-white text-[#9a7a24] shadow-sm" : "text-[#86919a]"}`}>待确认</button></div>
